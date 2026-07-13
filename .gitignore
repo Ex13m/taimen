@@ -1,0 +1,9 @@
+# секреты — никогда в git
+.env
+.env.*
+*.local.*
+
+# служебное
+node_modules/
+.netlify/
+.DS_Store
