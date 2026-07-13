@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060318">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>ТАЙМЕНЬ</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%236ea8ff' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff4a3a' stroke-width='5' stroke-dasharray='40 100'/%3E%3C/svg%3E">
 <style>
@@ -132,11 +135,28 @@
     background: rgba(10,14,40,.55); font-size: 18px; letter-spacing: .2em; color: #e6efff; border: 2px dashed rgba(110,168,255,.5); }
   #drop.show{ display: flex; }
 
+  /* дзен: интерфейс растворяется, остаётся живой орб */
+  #hud, #chat, #memchip, #knowbtn, .entlabel{ transition: opacity 1.2s; }
+  body.zen #hud, body.zen #memchip, body.zen #knowbtn, body.zen .entlabel{ opacity: 0.08; }
+  body.zen #chat{ opacity: 0.16; }
+
+  /* крупная строка распознавания, пока говоришь */
+  #hearing{
+    position: fixed; left: 50%; bottom: 22vh; transform: translateX(-50%);
+    z-index: 8; max-width: 86vw; text-align: center;
+    font-size: 22px; color: #eef4ff; text-shadow: 0 0 22px rgba(110,168,255,.9);
+    pointer-events: none; display: none;
+  }
+  #hearing.show{ display: block; }
+
   @media (max-width: 700px){
     #log{ max-height: 22vh; }
     #hud{ padding: 9px 12px; }
     #memchip{ font-size: 11px; }
     #camhint{ display: none; }
+    .btn{ padding: 12px 15px; font-size: 17px; }
+    #inp{ padding: 12px 13px; font-size: 16px; } /* 16px — чтобы iOS не зумил */
+    #hearing{ font-size: 18px; bottom: 26vh; }
   }
 </style>
 </head>
@@ -184,6 +204,7 @@
 </div>
 
 <div id="drop">отпусти — Таймень проглотит</div>
+<div id="hearing"></div>
 
 <script>
 'use strict';
@@ -411,7 +432,18 @@ const S = {
 const $ = (id) => document.getElementById(id);
 const logEl = $('log');
 
+/* дзен-режим: интерфейс уходит, когда им не пользуются */
+let lastUi = Date.now();
+function wakeUi(){ lastUi = Date.now(); document.body.classList.remove('zen'); }
+['pointerdown', 'keydown', 'wheel'].forEach((ev) => window.addEventListener(ev, wakeUi, { passive: true }));
+setInterval(() => {
+  if (!S.booted) return;
+  const busyState = S.state !== 'idle' || document.activeElement === $('inp');
+  if (!busyState && Date.now() - lastUi > 14000) document.body.classList.add('zen');
+}, 1000);
+
 function say(role, text, cls){
+  wakeUi();
   const div = document.createElement('div');
   div.className = 'msg ' + (cls || role);
   if (role === 'taimen' || role === 'ent'){
@@ -575,8 +607,9 @@ function camBasis(){
   return { pos, fwd, right, up: [ -up[0]/nu, -up[1]/nu, -up[2]/nu ] };
 }
 
-/* ввод: облёт, зум, тап */
+/* ввод: облёт с инерцией, зум, тап, двойной тап — домой */
 let dragging = false, moved = 0, px = 0, py = 0, pinch0 = 0, pinchD0 = 0;
+let vyaw = 0, vpitch = 0, lastTap = 0;
 const pointers = new Map();
 canvas.addEventListener('pointerdown', (e) => {
   pointers.set(e.pointerId, [e.clientX, e.clientY]);
@@ -599,13 +632,23 @@ canvas.addEventListener('pointermove', (e) => {
   px = e.clientX; py = e.clientY;
   cam.yaw -= dx * 0.005;
   cam.pitch = Math.min(1.2, Math.max(-1.2, cam.pitch + dy * 0.005));
+  vyaw = -dx * 0.005; vpitch = dy * 0.005;
 });
 function endPointer(e){
   pointers.delete(e.pointerId);
   if (pointers.size < 2) pinch0 = 0;
   if (pointers.size === 0){
     canvas.classList.remove('drag');
-    if (dragging && moved < 7) clickScene(e.clientX, e.clientY);
+    if (dragging && moved < 7){
+      const now = Date.now();
+      if (now - lastTap < 350){ // двойной тап — камера домой
+        if (S.activeEntity) toggleEntity(S.activeEntity);
+        cam.focus = 0; cam.goalDist = 5.4; cam.goalTarget = [0, 0.05, 0];
+      } else {
+        clickScene(e.clientX, e.clientY);
+      }
+      lastTap = now;
+    }
     dragging = false;
   }
 }
@@ -667,10 +710,15 @@ function tickOrbs(t){
 
   orbs.forEach((o, i) => {
     if (i === 0) return;
-    const birth = Math.min((t - o.birthT) / 2.8, 1);
-    const eb = easeOut(birth);
-    o.rad = o.radT * (0.10 + 0.90 * eb);
-    o.k = lerp(orbs[o.parent].rad * 0.9, 0.02, Math.min(Math.max((birth - 0.45) / 0.5, 0), 1));
+    // почкование: набухает в родителе -> вытягивается шейкой -> отрывается со щелчком
+    const birth = Math.min((t - o.birthT) / 4.2, 1);
+    const swell = Math.min(birth / 0.5, 1);
+    const pull = Math.min(Math.max((birth - 0.38) / 0.62, 0), 1);
+    const bo = pull >= 1 ? 1 : 1 + 2.70158 * Math.pow(pull - 1, 3) + 1.70158 * Math.pow(pull - 1, 2); // overshoot
+    const eb = bo;
+    o.rad = o.radT * (0.16 + 0.84 * easeOut(swell));
+    const tear = Math.min(Math.max((birth - 0.6) / 0.32, 0), 1);
+    o.k = birth >= 1 ? 0.02 : lerp(orbs[o.parent].rad * 1.05, 0.02, tear * tear);
     let slotPos;
     if (o.level === 1){
       const a = o.slot * Math.PI/2 + t * 0.05;
@@ -709,6 +757,11 @@ function tickOrbs(t){
   cam.target[1] = lerp(cam.target[1], cam.goalTarget[1], 0.04);
   cam.target[2] = lerp(cam.target[2], cam.goalTarget[2], 0.04);
   cam.dist = lerp(cam.dist, cam.goalDist, 0.05);
+  // инерция облёта
+  if (!dragging && (Math.abs(vyaw) > 1e-4 || Math.abs(vpitch) > 1e-4)){
+    cam.yaw += vyaw; cam.pitch = Math.min(1.2, Math.max(-1.2, cam.pitch + vpitch));
+    vyaw *= 0.94; vpitch *= 0.94;
+  }
 }
 
 /* upload + draw */
@@ -962,6 +1015,7 @@ async function sendMessage(text){
   text = (text || '').trim();
   if (!text || busy) return;
   busy = true;
+  $('send').textContent = '◌'; $('send').disabled = true;
   say('user', text);
   S.history.push({ role: 'user', content: text });
   S.userTurns++;
@@ -981,6 +1035,7 @@ async function sendMessage(text){
     setTimeout(() => { S.mood = MOODS.calm; setStatus(S.state); }, 4000);
   } finally {
     busy = false;
+    $('send').textContent = '➤'; $('send').disabled = false;
     if (S.state === 'thinking') setStatus('idle');
     persist();
   }
@@ -1050,6 +1105,9 @@ function startListening(){
       else interim += e.results[i][0].transcript;
     }
     $('inp').placeholder = interim || finalText || 'слушаю…';
+    const h = $('hearing');
+    h.textContent = (finalText + ' ' + interim).trim();
+    h.classList.toggle('show', !!h.textContent);
   };
   recog.onerror = () => stopListening();
   recog.onend = () => {
@@ -1064,6 +1122,7 @@ function startListening(){
 function stopListening(){
   $('mic').classList.remove('rec');
   $('inp').placeholder = 'скажи или напиши…';
+  $('hearing').classList.remove('show'); $('hearing').textContent = '';
   micMeterOff();
   if (S.state === 'listening') setStatus('idle');
   if (recog){ try { recog.onend = null; recog.stop(); } catch { /* ok */ } recog = null; }
@@ -1116,7 +1175,7 @@ $('start').onclick = () => {
   }
   setStatus('idle');
   // почкование свиты — по одному
-  ENT_ORDER.forEach((id, i) => setTimeout(() => spawnOrb(id, 0, 1), 900 + i * 1500));
+  ENT_ORDER.forEach((id, i) => setTimeout(() => spawnOrb(id, 0, 1), 800 + i * 2300));
   const greeting = S.history.length
     ? 'Я вынырнул. Помню, о чём мы говорили — продолжай.'
     : 'Я здесь. Смотри — свита рождается из меня. Говори вслух или пиши.';
