@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<title>ТАЙМЕНЬ</title>
+<title>TAIMEN</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%236ea8ff' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff4a3a' stroke-width='5' stroke-dasharray='40 100'/%3E%3C/svg%3E">
 <style>
   :root{
@@ -225,14 +225,15 @@
 <body>
 
 <canvas id="orb"></canvas>
+<canvas id="fx" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:3"></canvas>
 <div id="labels"></div>
 
 <div id="hud" class="glass">
-  <h1>ТАЙМЕНЬ</h1>
+  <h1>TAIMEN</h1>
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · колесо/щипок — ближе · тап по шару — слово ему</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.4.0 · © 2026 Ex13m</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.5.0 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -265,8 +266,8 @@
 </div>
 
 <div id="boot">
-  <h1>ТАЙМЕНЬ</h1>
-  <p>дух глубин в живом орбе. слушает, говорит, помнит. помощники почкуются от него, когда нужны.</p>
+  <h1>TAIMEN</h1>
+  <p>timing × men · дух глубин в живом орбе. слушает, говорит, помнит; помощники почкуются от него, когда нужны.</p>
   <button id="start">ЗАПУСК</button>
 </div>
 
@@ -285,13 +286,13 @@
    ========================================================= */
 
 const MAXO = 9;
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const WHATS_NEW = [
-  'АВТОНОМИЯ: Шпион сам ходит за новостями долголетия трижды в сутки и кормит Иммортала',
-  'ночной мастер: скажи «хочу, чтобы ты умел…» — ☆ пожелание, и ночью агент сам напишет код',
-  'бюджет-контроль: дневной лимит $ с допуском перерасхода строго 10%, датчик показывает %',
-  'доклады Шпиона при входе: что нашёл, пока тебя не было',
-  'книга пожеланий — в панели «✦ знания»',
+  'мы теперь TAIMEN — timing × men',
+  'маленькие 3D-ракеты летают между орбами при каждом взаимодействии',
+  'орбиты сами расходятся, если шары задевают друг друга',
+  'зум без границ: от поверхности шара до всей системы точками',
+  'из 1.4: авторазведка новостей, ночной мастер-самокод, бюджет с отсечкой +10%',
 ];
 
 /* ---------- Шейдеры ---------- */
@@ -403,7 +404,7 @@ void main(){
     glow += gc * 0.017;
     if (d < 0.0012*tt + 0.0009){ hit = true; break; }
     tt += d*0.9;
-    if (tt > 22.0) break;
+    if (tt > 60.0) break;
   }
 
   vec3 c;
@@ -605,7 +606,7 @@ function say(role, text, cls){
   div.className = 'msg ' + (cls || role);
   if (role === 'taimen' || role === 'ent'){
     const who = document.createElement('span'); who.className = 'who';
-    who.textContent = role === 'ent' && S.activeEntity ? ENTITIES[S.activeEntity].name : 'ТАЙМЕНЬ';
+    who.textContent = role === 'ent' && S.activeEntity ? ENTITIES[S.activeEntity].name : 'TAIMEN';
     div.appendChild(who);
   }
   div.appendChild(document.createTextNode(text));
@@ -749,7 +750,7 @@ function spawnOrb(entId, parentIdx, level){
     radT: level === 3 ? 0.13 : level === 2 ? 0.20 : 0.42,
     style: mkStyle(), seed: 1.3 + orbs.length * 2.17,
     sigil: e.sigil, sigVis: 0, palA: e.pal[0], palB: e.pal[1],
-    phase: Math.random() * 6.28,
+    phase: Math.random() * 6.28, boost: 1,
   };
   orbs.push(o);
   ensureLabel(o);
@@ -800,7 +801,7 @@ canvas.addEventListener('pointermove', (e) => {
     const pts = [...pointers.values()];
     const d = Math.hypot(pts[0][0]-pts[1][0], pts[0][1]-pts[1][1]);
     if (!pinch0){ pinch0 = d; pinchD0 = cam.goalDist; }
-    cam.goalDist = Math.min(9, Math.max(1.4, pinchD0 * pinch0 / Math.max(d, 20)));
+    cam.goalDist = Math.min(40, Math.max(0.4, pinchD0 * pinch0 / Math.max(d, 20)));
     return;
   }
   const dx = e.clientX - px, dy = e.clientY - py;
@@ -843,7 +844,7 @@ canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  cam.goalDist = Math.min(9, Math.max(1.4, cam.goalDist * (1 + Math.sign(e.deltaY) * 0.12)));
+  cam.goalDist = Math.min(40, Math.max(0.4, cam.goalDist * (1 + Math.sign(e.deltaY) * 0.12)));
 }, { passive: false });
 
 function pickOrb(cx, cy){
@@ -911,6 +912,7 @@ async function analyzeArticle(text){
     while (S.immortal.analyses.length > 30) S.immortal.analyses.pop();
     S.immortal.shiftMs += a.shift * 86400000;
     persist();
+    launchRocket('shpion', 'immortal');
     const iIdx = orbIdxByEnt('immortal');
     if (iIdx >= 0) showInfo(iIdx); // перерисовать окно
     say('sys', '⌛ Иммортал: ' + (a.rating >= 0 ? '+' : '') + a.rating + ' · сдвиг ' +
@@ -930,7 +932,7 @@ function showInfo(idx){
   const st = S.orbStats[key] || { in: 0, out: 0, cost: 0, last: '', ts: 0 };
   let html;
   if (!o.entId){
-    html = '<h2>ТАЙМЕНЬ <span class="ix" id="ic-x">✕</span></h2>' +
+    html = '<h2>TAIMEN <span class="ix" id="ic-x">✕</span></h2>' +
       '<div class="epithet">дух глубин · главный орб · v' + APP_VERSION + '</div>' +
       '<div class="row"><span class="lbl">РАЗУМ</span>Claude Fable 5 (фолбэк — Opus 4.8)</div>' +
       '<div class="row skills"><span class="lbl">УМЕНИЯ</span><span>беседа голосом</span><span>свита</span><span>самообучение</span><span>знания</span><span>настроения</span></div>' +
@@ -985,7 +987,7 @@ function hideInfo(){ $('infocard').classList.remove('show'); clearInterval(cdTim
 /* фокус камеры */
 function focusOrb(i){
   cam.focus = i;
-  cam.goalDist = i <= 0 ? 4.8 : Math.max(1.6, orbs[i].rad * 5.2);
+  cam.goalDist = i <= 0 ? 4.8 : Math.max(0.7, orbs[i].rad * 5.2);
 }
 
 /* ---------- Персональность: цели анимации ---------- */
@@ -1022,13 +1024,14 @@ function tickOrbs(t){
     const tear = Math.min(Math.max((birth - 0.6) / 0.32, 0), 1);
     o.k = birth >= 1 ? 0.02 : lerp(orbs[o.parent].rad * 1.05, 0.02, tear * tear);
     let slotPos;
+    const grow = o.boost || 1; // авторасширение орбиты при тесноте
     if (o.level === 1){
       const a = o.slot * Math.PI/2 + t * 0.05;
-      slotPos = [ Math.cos(a)*2.5, Math.sin(t*0.5 + o.phase)*0.14, Math.sin(a)*2.5 ];
+      slotPos = [ Math.cos(a)*2.5*grow, Math.sin(t*0.5 + o.phase)*0.14, Math.sin(a)*2.5*grow ];
     } else {
       // орбита вокруг родителя: чем младше поколение, тем теснее и шустрее (как луна)
       const pp = orbs[o.parent].pos;
-      const R2 = o.level === 3 ? 0.42 : 0.85;
+      const R2 = (o.level === 3 ? 0.42 : 0.85) * grow;
       const spd = o.level === 3 ? 0.75 : 0.4;
       const a2 = t*spd + o.phase;
       slotPos = [ pp[0] + Math.cos(a2)*R2, pp[1] + Math.sin(t*0.8 + o.phase)*0.12, pp[2] + Math.sin(a2)*R2 ];
@@ -1053,6 +1056,21 @@ function tickOrbs(t){
       o.sigVis = lerp(o.sigVis, cyc > 0.86 ? 0.55 : 0.0, 0.02);
     }
   });
+
+  // теснота: задевают друг друга — орбиты расходятся (родитель-дитя не считаем)
+  for (let i = 1; i < orbs.length; i++){
+    const oi = orbs[i];
+    if ((t - oi.birthT) < 4.2) continue;
+    let crowded = false;
+    for (let j = 0; j < orbs.length; j++){
+      if (i === j || oi.parent === j || orbs[j].parent === i) continue;
+      const oj = orbs[j];
+      const dx = oi.pos[0]-oj.pos[0], dy = oi.pos[1]-oj.pos[1], dz = oi.pos[2]-oj.pos[2];
+      if (Math.hypot(dx, dy, dz) < (oi.rad + oj.rad) * 1.35){ crowded = true; break; }
+    }
+    if (crowded) oi.boost = Math.min(2.4, (oi.boost || 1) + 0.012);
+    else oi.boost = (oi.boost || 1) + (1 - (oi.boost || 1)) * 0.004; // плавно домой
+  }
 
   // камера
   if (cam.focus >= 0 && cam.focus < orbs.length){
@@ -1106,6 +1124,81 @@ function draw(t){
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
+/* проекция мира в экран */
+function project(b, wp){
+  const rel = [ wp[0]-b.pos[0], wp[1]-b.pos[1], wp[2]-b.pos[2] ];
+  const z = rel[0]*b.fwd[0] + rel[1]*b.fwd[1] + rel[2]*b.fwd[2];
+  if (z < 0.25) return null;
+  const x = rel[0]*b.right[0] + rel[1]*b.right[1] + rel[2]*b.right[2];
+  const y = rel[0]*b.up[0] + rel[1]*b.up[1] + rel[2]*b.up[2];
+  return {
+    x: window.innerWidth/2 + (x/z)*1.6/2 * window.innerHeight,
+    y: window.innerHeight/2 - (y/z)*1.6/2 * window.innerHeight,
+    z,
+  };
+}
+
+/* маленькие 3D-ракеты между орбами при взаимодействиях */
+const rockets = [];
+function launchRocket(fromEnt, toEnt){
+  const a = fromEnt === 'main' ? 0 : orbIdxByEnt(fromEnt);
+  const bI = toEnt === 'main' ? 0 : orbIdxByEnt(toEnt);
+  if (a < 0 || bI < 0 || a === bI || rockets.length > 8) return;
+  rockets.push({ a, b: bI, e: 0, dur: 1.4 + Math.random()*0.7,
+    side: Math.random() < 0.5 ? 1 : -1, lift: 0.3 + Math.random()*0.5, trail: [] });
+}
+const fxCv = $('fx');
+const fxCtx = fxCv ? fxCv.getContext('2d') : null;
+let lastFrameT = 0;
+function drawRockets(bas, t){
+  if (!fxCtx) return;
+  const dt = Math.min(0.05, t - lastFrameT || 0.016); lastFrameT = t;
+  if (fxCv.width !== window.innerWidth || fxCv.height !== window.innerHeight){
+    fxCv.width = window.innerWidth; fxCv.height = window.innerHeight;
+  }
+  fxCtx.clearRect(0, 0, fxCv.width, fxCv.height);
+  for (let r = rockets.length - 1; r >= 0; r--){
+    const rk = rockets[r];
+    rk.e += dt / rk.dur;
+    if (rk.e >= 1){ rockets.splice(r, 1); continue; }
+    const A = orbs[rk.a], B = orbs[rk.b];
+    if (!A || !B){ rockets.splice(r, 1); continue; }
+    const e = rk.e, ease = e*e*(3 - 2*e);
+    // дуга: прямая + перпендикулярный подъём, затухающий к концам
+    const arc = Math.sin(Math.PI * ease) * rk.lift * rk.side;
+    const mid = [
+      A.pos[0] + (B.pos[0]-A.pos[0])*ease,
+      A.pos[1] + (B.pos[1]-A.pos[1])*ease + arc*0.6,
+      A.pos[2] + (B.pos[2]-A.pos[2])*ease + arc*0.4,
+    ];
+    const p = project(bas, mid);
+    if (!p) continue;
+    rk.trail.push({ x: p.x, y: p.y, z: p.z });
+    if (rk.trail.length > 14) rk.trail.shift();
+    // хвост
+    for (let i = 0; i < rk.trail.length; i++){
+      const tp = rk.trail[i], k = i / rk.trail.length;
+      const sz = Math.max(0.6, 5 / tp.z * (0.3 + k));
+      fxCtx.beginPath();
+      fxCtx.fillStyle = 'rgba(' + (255) + ',' + Math.round(170 + 60*k) + ',' + Math.round(90 + 120*k) + ',' + (0.10 + 0.4*k) + ')';
+      fxCtx.arc(tp.x, tp.y, sz, 0, 7);
+      fxCtx.fill();
+    }
+    // корпус: капля по направлению движения
+    const prev = rk.trail[rk.trail.length - 2] || p;
+    const ang = Math.atan2(p.y - prev.y, p.x - prev.x);
+    const s = Math.max(2, 13 / p.z);
+    fxCtx.save();
+    fxCtx.translate(p.x, p.y); fxCtx.rotate(ang);
+    fxCtx.shadowColor = 'rgba(255,220,150,.9)'; fxCtx.shadowBlur = 10;
+    fxCtx.fillStyle = '#fff';
+    fxCtx.beginPath();
+    fxCtx.moveTo(s, 0); fxCtx.lineTo(-s*0.7, s*0.42); fxCtx.lineTo(-s*0.4, 0); fxCtx.lineTo(-s*0.7, -s*0.42);
+    fxCtx.closePath(); fxCtx.fill();
+    fxCtx.restore();
+  }
+}
+
 /* подписи в экранных координатах */
 function placeLabels(){
   const b = camBasis();
@@ -1131,6 +1224,7 @@ let t0 = performance.now();
   tickOrbs(t);
   draw(t);
   placeLabels();
+  drawRockets(camBasis(), t);
   requestAnimationFrame(frame);
 })();
 
@@ -1144,6 +1238,7 @@ function toggleEntity(id){
     el.classList.remove('active');
     $('active-entity').style.display = 'none';
     focusOrb(0);
+    launchRocket(id, 'main');
     say('sys', '↩ снова говорит сам Таймень');
   } else {
     if (S.activeEntity){ const p = $('ent-' + S.activeEntity); if (p) p.classList.remove('active'); }
@@ -1153,6 +1248,7 @@ function toggleEntity(id){
     ae.textContent = '◈ на связи: ' + ENTITIES[id].name;
     ae.style.display = 'block';
     if (idx > 0) focusOrb(idx);
+    launchRocket('main', id);
     say('sys', '◈ ' + ENTITIES[id].name + ' слушает (' + ENTITIES[id].hint + ')');
   }
 }
@@ -1168,6 +1264,7 @@ function suggestEntity(id){
   const el = $('ent-' + id);
   if (S.activeEntity !== id && el){
     el.classList.add('suggested');
+    launchRocket('main', id);
     say('sys', '✦ ' + e.name + ' вступает: ' + e.hint + ' — тап по его шару, чтобы передать слово');
     setTimeout(() => el.classList.remove('suggested'), 45000);
   }
@@ -1414,6 +1511,7 @@ async function sendMessage(text){
     for (const note of p.notes){
       if (!S.notes.some(n => n.toLowerCase() === note.toLowerCase())){
         S.notes.push(note);
+        launchRocket('main', 'hranitel');
         say('sys', '⛬ запомнил: ' + note);
       }
     }
@@ -1430,6 +1528,7 @@ async function sendMessage(text){
     for (const w of p.wishes){
       if (!S.wishes.some(x => x.text.toLowerCase() === w.toLowerCase())){
         S.wishes.push({ text: w, ts: Date.now() });
+        launchRocket('main', 'strateg');
         say('sys', '☆ в книгу пожеланий: ' + w + ' — ночной мастер возьмётся');
       }
     }
@@ -1638,7 +1737,7 @@ function showUpdateNews(){
   if (seen === APP_VERSION) return;
   const ov = document.createElement('div'); ov.id = 'news';
   const card = document.createElement('div'); card.id = 'newscard'; card.className = 'glass';
-  card.innerHTML = '<h2>ТАЙМЕНЬ ОБНОВИЛСЯ</h2><div class="ver">версия ' + APP_VERSION + ' · что нового:</div>' +
+  card.innerHTML = '<h2>TAIMEN ОБНОВИЛСЯ</h2><div class="ver">версия ' + APP_VERSION + ' · что нового:</div>' +
     '<ul>' + WHATS_NEW.map(w => '<li>' + w + '</li>').join('') + '</ul>' +
     '<button class="btn" id="news-ok">поплыли ➤</button>';
   ov.appendChild(card);
