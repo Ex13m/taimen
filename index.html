@@ -19,11 +19,11 @@
   body{
     font: 15px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
     color: var(--text);
-    background:
-      radial-gradient(120% 90% at 50% 42%, #1a1150 0%, #120a38 38%, #070420 72%, #030210 100%);
+    background: radial-gradient(120% 90% at 50% 42%, #14104a 0%, #0d0832 40%, #060318 75%, #020108 100%);
     user-select: none;
   }
-  canvas#orb{ position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  canvas#orb{ position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  canvas#orb.drag{ cursor: grabbing; }
 
   .glass{
     background: var(--glass);
@@ -40,12 +40,24 @@
   #hud .sub{ font-size: 12px; color: var(--dim); margin-top: 4px; display: flex; gap: 8px; align-items: center; }
   #status-dot{ width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); transition: background .4s, box-shadow .4s; }
   #active-entity{ font-size: 11px; margin-top: 6px; color: var(--accent); display: none; }
+  #camhint{ font-size: 10px; margin-top: 6px; color: var(--dim); opacity: .7; }
 
   #memchip{
     position: fixed; top: 14px; right: 14px; z-index: 5;
     padding: 8px 14px; font-size: 12px; color: var(--dim); cursor: pointer;
   }
   #memchip b{ color: var(--text); font-weight: 500; }
+
+  /* подписи орбов в 3D */
+  .entlabel{
+    position: fixed; z-index: 4; transform: translate(-50%, -100%);
+    font-size: 10px; letter-spacing: .22em; color: var(--dim);
+    text-shadow: 0 0 8px rgba(0,0,20,.9); pointer-events: auto; cursor: pointer;
+    padding: 4px 8px; transition: color .4s, text-shadow .4s; white-space: nowrap;
+  }
+  .entlabel.suggested{ color: #ffe9b0; text-shadow: 0 0 14px rgba(255,220,140,.9); animation: lblpulse 1.6s infinite; }
+  .entlabel.active{ color: #ffffff; text-shadow: 0 0 16px rgba(160,190,255,1); }
+  @keyframes lblpulse{ 50%{ opacity: .55; } }
 
   /* Чат */
   #chat{
@@ -55,7 +67,7 @@
     display: flex; flex-direction: column; gap: 8px;
   }
   #log{
-    max-height: 30vh; overflow-y: auto; display: flex; flex-direction: column; gap: 7px;
+    max-height: 26vh; overflow-y: auto; display: flex; flex-direction: column; gap: 7px;
     padding: 4px 2px; scrollbar-width: thin; scrollbar-color: rgba(110,168,255,.3) transparent;
   }
   .msg{ max-width: 86%; padding: 8px 12px; border-radius: 12px; font-size: 14px; white-space: pre-wrap; user-select: text; }
@@ -80,21 +92,6 @@
   .btn.on{ border-color: var(--accent); box-shadow: 0 0 14px rgba(110,168,255,.35); }
   .btn.rec{ border-color: var(--warn); box-shadow: 0 0 16px rgba(255,110,100,.5); animation: recpulse 1.2s infinite; }
   @keyframes recpulse{ 50%{ box-shadow: 0 0 26px rgba(255,110,100,.8); } }
-
-  /* Свита — суб-орбы */
-  #dock{
-    position: fixed; right: 14px; top: 50%; transform: translateY(-50%);
-    z-index: 5; display: flex; flex-direction: column; gap: 12px; padding: 12px 10px;
-  }
-  .ent{ display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; opacity: .55; transition: opacity .4s; }
-  .ent:hover{ opacity: .9; }
-  .ent canvas{ width: 62px; height: 62px; border-radius: 50%; }
-  .ent .nm{ font-size: 10px; letter-spacing: .08em; color: var(--dim); }
-  .ent.suggested{ opacity: 1; }
-  .ent.suggested canvas{ box-shadow: 0 0 22px rgba(160,190,255,.55); border-radius: 50%; }
-  .ent.active{ opacity: 1; }
-  .ent.active .nm{ color: #e6efff; }
-  .ent.active canvas{ box-shadow: 0 0 26px rgba(160,190,255,.8); }
 
   /* Знания и память */
   #knowbtn{ position: fixed; left: 14px; bottom: 16px; z-index: 7; }
@@ -123,7 +120,7 @@
   }
   #boot.gone{ opacity: 0; pointer-events: none; }
   #boot h1{ font-size: 30px; letter-spacing: .5em; font-weight: 300; color: #e6efff; text-shadow: 0 0 40px rgba(110,168,255,.9); padding-left: .5em; }
-  #boot p{ color: var(--dim); font-size: 13px; max-width: 300px; text-align: center; }
+  #boot p{ color: var(--dim); font-size: 13px; max-width: 320px; text-align: center; }
   #start{
     font-size: 16px; letter-spacing: .3em; padding: 14px 44px 14px 48px; border-radius: 40px;
     background: rgba(20,28,64,.5); border: 1px solid rgba(110,168,255,.5); color: #e6efff; cursor: pointer;
@@ -136,27 +133,26 @@
   #drop.show{ display: flex; }
 
   @media (max-width: 700px){
-    #dock{ top: auto; bottom: 34vh; right: 8px; transform: none; gap: 8px; padding: 8px 6px; }
-    .ent canvas{ width: 46px; height: 46px; }
-    #log{ max-height: 24vh; }
+    #log{ max-height: 22vh; }
     #hud{ padding: 9px 12px; }
     #memchip{ font-size: 11px; }
+    #camhint{ display: none; }
   }
 </style>
 </head>
 <body>
 
 <canvas id="orb"></canvas>
+<div id="labels"></div>
 
 <div id="hud" class="glass">
   <h1>ТАЙМЕНЬ</h1>
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
+  <div id="camhint">тяни — облёт · колесо/щипок — ближе · тап по шару — слово ему</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
-
-<div id="dock" class="glass" title="свита Тайменя"></div>
 
 <button id="knowbtn" class="btn" title="скормить материалы">✦ знания</button>
 <div id="know" class="glass">
@@ -183,7 +179,7 @@
 
 <div id="boot">
   <h1>ТАЙМЕНЬ</h1>
-  <p>голографический дух глубин. слушает, говорит, помнит, зовёт помощников.</p>
+  <p>дух глубин в живом орбе. слушает, говорит, помнит. помощники почкуются от него, когда нужны.</p>
   <button id="start">ЗАПУСК</button>
 </div>
 
@@ -192,174 +188,205 @@
 <script>
 'use strict';
 /* =========================================================
-   ТАЙМЕНЬ — standalone. Vanilla JS, ноль зависимостей.
-   Мозг: POST /api/chat (Netlify Function -> Anthropic).
-   Память: localStorage + POST/GET /api/memory (Git).
+   ТАЙМЕНЬ — настоящее 3D: raymarching-метаболы.
+   Главный шар в центре; помощники ПОЧКУЮТСЯ из него и
+   отрываются на четыре стороны. Камера: облёт, зум, фокус.
+   Кельтские сигилы проступают шумом на поверхности.
    ========================================================= */
 
-/* ---------- WebGL орб ---------- */
+const MAXO = 9;
+
+/* ---------- Шейдеры ---------- */
 const VERT = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
 const FRAG = `
 precision highp float;
-uniform vec2 u_res; uniform float u_time; uniform float u_amp; uniform float u_flow;
-uniform float u_pulse; uniform float u_inner; uniform float u_mix;
-uniform vec3 u_colA; uniform vec3 u_colB; uniform float u_seed; uniform vec2 u_par;
-uniform float u_radius;
+uniform vec2 u_res; uniform float u_time;
+uniform vec3 u_camPos, u_camFwd, u_camRight, u_camUp;
+uniform int u_count;
+uniform vec4 u_posRad[${MAXO}];   /* xyz позиция, w радиус */
+uniform vec4 u_style[${MAXO}];    /* flow, amp, pulse, inner */
+uniform vec4 u_misc[${MAXO}];     /* k(смин), seed, тайл сигила, видимость сигила */
+uniform vec3 u_colA[${MAXO}];
+uniform vec3 u_colB[${MAXO}];
+uniform sampler2D u_tex;
 
-float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float noise(vec2 p){
-  vec2 i = floor(p), f = fract(p);
-  vec2 u = f*f*(3.0-2.0*f);
-  return mix(mix(hash(i), hash(i+vec2(1.,0.)), u.x),
-             mix(hash(i+vec2(0.,1.)), hash(i+vec2(1.,1.)), u.x), u.y);
+float hash1(float n){ return fract(sin(n)*43758.5453); }
+float hash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise2(vec2 p){
+  vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0-2.0*f);
+  return mix(mix(hash2(i), hash2(i+vec2(1,0)), u.x), mix(hash2(i+vec2(0,1)), hash2(i+vec2(1,1)), u.x), u.y);
 }
-float fbm(vec2 p){
-  float v = 0.0, a = 0.5;
-  for(int i=0;i<4;i++){ v += a*noise(p); p = p*2.03 + 17.0; a *= 0.5; }
-  return v;
+float fbm2(vec2 p){ float v=0.0,a=0.5; for(int i=0;i<3;i++){ v+=a*noise2(p); p=p*2.03+17.0; a*=0.5; } return v; }
+float noise3(vec3 p){
+  vec3 i = floor(p), f = fract(p); vec3 u = f*f*(3.0-2.0*f);
+  float n = dot(i, vec3(1.0, 57.0, 113.0));
+  return mix(
+    mix(mix(hash1(n), hash1(n+1.0), u.x),   mix(hash1(n+57.0), hash1(n+58.0), u.x), u.y),
+    mix(mix(hash1(n+113.0), hash1(n+114.0), u.x), mix(hash1(n+170.0), hash1(n+171.0), u.x), u.y), u.z);
 }
+float fbm3(vec3 p){ return noise3(p)*0.65 + noise3(p*2.13+31.0)*0.35; }
+
+float smin(float a, float b, float k){
+  float h = clamp(0.5 + 0.5*(b-a)/k, 0.0, 1.0);
+  return mix(b, a, h) - k*h*(1.0-h);
+}
+
+/* дистанция до орба с органическим смещением поверхности
+   (uniform-массивы индексируются только счётчиком цикла — требование GLSL ES 1.0) */
+float sdOrb(vec3 p, vec4 pr, float flow, float ampl, float pulse, float seed){
+  vec3 q = p - pr.xyz;
+  float R = pr.w;
+  float l = length(q);
+  float base = l - R;
+  if (abs(base) < R*0.7){
+    vec3 dir = q / max(l, 1e-4);
+    float t = u_time;
+    float n1 = fbm3(dir*2.6 + seed + t*0.14*flow) - 0.5;
+    float n2 = fbm3(dir*6.0 - seed*1.7 - t*0.22*flow) - 0.5;
+    base -= (n1*0.7 + n2*0.4) * (ampl + pulse*0.06) * R * 2.4;
+  }
+  return base;
+}
+
+float map(vec3 p, out vec3 gcol){
+  float d = sdOrb(p, u_posRad[0], u_style[0].x, u_style[0].y, u_style[0].z, u_misc[0].y);
+  gcol = (u_colA[0]+u_colB[0]) * 0.5 * exp(-max(d,0.0)*4.5);
+  for (int i = 1; i < ${MAXO}; i++){
+    if (i >= u_count) break;
+    float di = sdOrb(p, u_posRad[i], u_style[i].x, u_style[i].y, u_style[i].z, u_misc[i].y);
+    d = smin(d, di, max(u_misc[i].x, 0.001));
+    gcol += (u_colA[i]+u_colB[i]) * 0.5 * exp(-max(di,0.0)*4.5);
+  }
+  return d;
+}
+
+int nearest(vec3 p){
+  int id = 0; float best = 1e9;
+  for (int i = 0; i < ${MAXO}; i++){
+    if (i >= u_count) break;
+    float di = length(p - u_posRad[i].xyz) - u_posRad[i].w;
+    if (di < best){ best = di; id = i; }
+  }
+  return id;
+}
+
+vec3 bgSky(vec3 rd){
+  float up = rd.y*0.5 + 0.5;
+  vec3 bg = mix(vec3(0.010, 0.006, 0.040), vec3(0.055, 0.035, 0.16), pow(up, 1.6));
+  bg += vec3(0.05, 0.02, 0.10) * fbm2(rd.xz*2.0 + rd.y) * 0.35;
+  /* звёзды */
+  vec3 a = abs(rd);
+  vec2 su = (a.x > a.y && a.x > a.z) ? rd.yz/rd.x : (a.y > a.z ? rd.xz/rd.y : rd.xy/rd.z);
+  vec2 cell = floor(su*90.0);
+  float s = hash2(cell);
+  if (s > 0.994){
+    vec2 f = fract(su*90.0) - 0.5;
+    bg += vec3(0.8, 0.85, 1.0) * (s-0.994)/0.006 * exp(-dot(f,f)*60.0) * (0.5 + 0.5*sin(u_time*1.5 + s*40.0));
+  }
+  return bg;
+}
+
 void main(){
-  vec2 uv = (gl_FragCoord.xy - 0.5*u_res) / min(u_res.x, u_res.y);
-  uv -= u_par * 0.035;
-  uv += vec2(sin(u_time*0.43), cos(u_time*0.31)) * 0.006; // орб плавает
-  float r = length(uv);
-  float ang = atan(uv.y, uv.x);
-  vec2 circ = vec2(cos(ang), sin(ang));
+  vec2 ndc = (gl_FragCoord.xy - 0.5*u_res) / u_res.y * 2.0;
+  vec3 ro = u_camPos;
+  vec3 rd = normalize(u_camFwd*1.6 + u_camRight*ndc.x + u_camUp*ndc.y);
   float t = u_time;
 
-  float n1 = fbm(circ*1.8 + u_seed + t*0.16*u_flow);
-  float n2 = fbm(circ*3.6 - u_seed*1.7 - t*0.24*u_flow + 10.0);
-  float n3 = fbm(circ*6.5 + u_seed*0.6 + t*0.4*u_flow);
-  float disp = (n1-0.5)*u_amp + (n2-0.5)*u_amp*0.6 + (n3-0.5)*(u_amp*0.25 + u_pulse*0.05);
-  float R = u_radius + disp + u_pulse*0.012;
-  float d = r - R;
-
-  float core = exp(-abs(d)*100.0) * 1.7;
-  float glow = exp(-abs(d)*20.0) * 0.6;
-  float halo = exp(-abs(d)*5.5) * (0.16 + u_pulse*0.10);
-
-  float m = fbm(circ*2.2 + u_seed*3.1 + t*0.11*u_flow);
-  m = clamp(m + (u_mix - 0.5)*1.1, 0.0, 1.0);
-  vec3 col = mix(u_colA, u_colB, m);
-
-  vec3 c = col * (core + glow + halo);
-
-  if (r < R) {
-    // лицевая часть: настоящая полусфера с нормалями
-    float rr = clamp(r / R, 0.0, 1.0);
-    vec3 nrm = normalize(vec3(uv / R, sqrt(max(1.0 - rr*rr, 0.0))));
-    // медленное вращение поверхности
-    float rot = t * 0.14 * (0.5 + u_flow*0.5);
-    mat2 m2 = mat2(cos(rot), -sin(rot), sin(rot), cos(rot));
-    vec2 sp = m2 * (nrm.xy / (1.0 + nrm.z)); // координата на поверхности сферы
-
-    // плазменные волокна, плывущие по лицу
-    float f1 = fbm(sp*3.0 + u_seed + t*0.10);
-    float fil = smoothstep(0.42, 0.78, fbm(sp*4.5 + f1*1.6 - t*0.09 + u_seed));
-    float veins = smoothstep(0.55, 0.95, fbm(sp*8.0 - t*0.14 + f1)) * 0.7;
-
-    // 3D-вибрации: бегущие волны по поверхности, растут с пульсом и речью
-    float wv = sin((nrm.x*7.0 + nrm.y*5.0 + f1*4.0) - t*(2.2 + u_flow*2.5));
-    float wave = pow(wv*0.5 + 0.5, 3.0) * (0.22 + u_pulse*1.5);
-
-    // свет и стекло
-    vec3 L = normalize(vec3(u_par.x*0.6 + 0.45, u_par.y*0.6 + 0.55, 0.62));
-    float diff = max(dot(nrm, L), 0.0);
-    float spec = pow(max(dot(reflect(-L, nrm), vec3(0.0,0.0,1.0)), 0.0), 26.0);
-    float fres = pow(1.0 - nrm.z, 2.4);
-
-    float bright = 0.22 + u_inner*0.6;
-    vec3 face = col * (fres*1.2 + diff*0.30 + fil*0.95 + veins*0.6 + wave*1.1 + 0.12) * bright
-              + vec3(0.9, 0.95, 1.0) * spec * 0.35 * bright;
-    c += face;
+  vec3 glow = vec3(0.0);
+  float tt = 0.0; bool hit = false; vec3 p = ro;
+  for (int s = 0; s < 72; s++){
+    p = ro + rd*tt;
+    vec3 gc;
+    float d = map(p, gc);
+    glow += gc * 0.017;
+    if (d < 0.0012*tt + 0.0009){ hit = true; break; }
+    tt += d*0.9;
+    if (tt > 22.0) break;
   }
-  float lum = max(max(c.r, c.g), c.b);
-  gl_FragColor = vec4(c, clamp(lum * 1.4, 0.0, 1.0));
+
+  vec3 c;
+  if (!hit){
+    c = bgSky(rd) + glow*0.9;
+  } else {
+    int id = nearest(p);
+    /* материал орба id (WebGL1: выбор в цикле) */
+    vec3 colA = u_colA[0], colB = u_colB[0]; vec4 st = u_style[0]; vec4 ms = u_misc[0]; vec4 pr = u_posRad[0];
+    for (int i = 0; i < ${MAXO}; i++){
+      if (i == id){ colA = u_colA[i]; colB = u_colB[i]; st = u_style[i]; ms = u_misc[i]; pr = u_posRad[i]; }
+    }
+    vec3 dir = normalize(p - pr.xyz);
+    /* нормаль: сфера + возмущение шумом */
+    vec3 e = vec3(0.06, 0.0, 0.0);
+    float nb = fbm3(dir*6.0 + ms.y + t*0.2*st.x);
+    vec3 n = normalize(dir + 0.5*st.y/0.05*0.0 + vec3(
+      fbm3(dir*6.0 + e.xyy + ms.y + t*0.2*st.x) - nb,
+      fbm3(dir*6.0 + e.yxy + ms.y + t*0.2*st.x) - nb,
+      fbm3(dir*6.0 + e.yyx + ms.y + t*0.2*st.x) - nb) * 2.2 * (st.y + 0.02));
+
+    /* поверхность вращается */
+    float rot = t * 0.12 * (0.5 + st.x*0.5);
+    vec3 nr = vec3(dir.x*cos(rot) - dir.z*sin(rot), dir.y, dir.x*sin(rot) + dir.z*cos(rot));
+    vec2 sp = nr.xy / (1.0 + abs(nr.z) + 0.2);
+
+    float f1 = fbm2(sp*3.0 + ms.y + t*0.10);
+    float fil = smoothstep(0.42, 0.78, fbm2(sp*4.5 + f1*1.6 - t*0.09 + ms.y));
+    float veins = smoothstep(0.55, 0.95, fbm2(sp*8.0 - t*0.14 + f1)) * 0.7;
+    float wv = sin((nr.x*7.0 + nr.y*5.0 + f1*4.0) - t*(2.0 + st.x*2.5));
+    float wave = pow(wv*0.5 + 0.5, 3.0) * (0.25 + st.z*1.4);
+
+    float m = clamp(fbm2(sp*2.0 + ms.y*2.7 + t*0.08) + (fil-0.5)*0.6, 0.0, 1.0);
+    vec3 col = mix(colA, colB, m);
+
+    vec3 L1 = normalize(vec3(0.55, 0.8, 0.5));
+    float diff = max(dot(n, L1), 0.0);
+    float fres = pow(1.0 - max(dot(n, -rd), 0.0), 2.6);
+    float spec = pow(max(dot(reflect(rd, n), L1), 0.0), 30.0);
+
+    float bright = 0.30 + st.w*0.65;
+    c = col * (fres*3.4 + diff*0.25 + fil*1.15 + veins*0.6 + wave*1.25 + 0.10) * bright
+      + col * pow(fres, 3.0) * 2.2                 /* плазменный обод */
+      + vec3(0.9, 0.95, 1.0) * spec * 0.5 * bright;
+
+    /* кельтский сигил проступает шумом */
+    if (ms.w > 0.01){
+      vec2 su = clamp((vec2(atan(nr.x, nr.z)/3.1416, nr.y*1.35) )*1.15*0.5 + 0.5, 0.0, 1.0);
+      float tile = ms.z;
+      vec2 tuv = (vec2(mod(tile, 3.0), floor(tile/3.0)) + su) / 3.0;
+      float sig = texture2D(u_tex, tuv).a;
+      float edge = smoothstep(0.0, 0.15, su.x)*smoothstep(1.0, 0.85, su.x)*smoothstep(0.0, 0.15, su.y)*smoothstep(1.0, 0.85, su.y);
+      float front = smoothstep(0.05, 0.5, dot(dir, -rd));
+      float flick = 0.55 + 0.45*fbm2(su*7.0 + t*0.9);
+      c += col * sig * edge * front * flick * ms.w * 1.6;
+    }
+
+    c += glow*0.55;
+    /* дымка расстояния */
+    c = mix(c, bgSky(rd), clamp(tt*0.012, 0.0, 0.4));
+  }
+
+  c = 1.0 - exp(-c*1.7);              /* тонмап */
+  float vig = 1.0 - 0.35*pow(length(ndc*0.55), 2.0);
+  gl_FragColor = vec4(c*vig, 1.0);
 }`;
 
-function makeOrb(canvas, palette, seed, radius){
-  const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false, antialias: true });
-  if (!gl) return null;
-  function sh(type, src){
-    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn(gl.getShaderInfoLog(s)); return null; }
-    return s;
-  }
-  const prog = gl.createProgram();
-  const vs = sh(gl.VERTEX_SHADER, VERT), fs = sh(gl.FRAGMENT_SHADER, FRAG);
-  if (!vs || !fs) return null;
-  gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null;
-  gl.useProgram(prog);
-  const buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
-  const loc = gl.getAttribLocation(prog, 'p');
-  gl.enableVertexAttribArray(loc);
-  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  const U = {};
-  ['u_res','u_time','u_amp','u_flow','u_pulse','u_inner','u_mix','u_colA','u_colB','u_seed','u_par','u_radius']
-    .forEach(n => U[n] = gl.getUniformLocation(prog, n));
-
-  // текущие и целевые значения — сглаживание в render()
-  const cur = { amp:.02, flow:.5, pulse:.03, inner:.12, mix:.5, par:[0,0] };
-  const tgt = { amp:.02, flow:.5, pulse:.03, inner:.12, mix:.5, par:[0,0] };
-  let pal = palette.slice();
-
-  function resize(){
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
-    if (canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; gl.viewport(0,0,w,h); }
-  }
-  function lerp(a,b,k){ return a + (b-a)*k; }
-
-  return {
-    tgt,
-    setPalette(p){ pal = p.slice(); },
-    render(t){
-      resize();
-      cur.amp   = lerp(cur.amp,   tgt.amp,   .05);
-      cur.flow  = lerp(cur.flow,  tgt.flow,  .04);
-      cur.pulse = lerp(cur.pulse, tgt.pulse, .28);
-      cur.inner = lerp(cur.inner, tgt.inner, .05);
-      cur.mix   = lerp(cur.mix,   tgt.mix,   .02);
-      cur.par[0]= lerp(cur.par[0],tgt.par[0],.06);
-      cur.par[1]= lerp(cur.par[1],tgt.par[1],.06);
-      gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.uniform2f(U.u_res, canvas.width, canvas.height);
-      gl.uniform1f(U.u_time, t);
-      gl.uniform1f(U.u_amp, cur.amp);
-      gl.uniform1f(U.u_flow, cur.flow);
-      gl.uniform1f(U.u_pulse, cur.pulse);
-      gl.uniform1f(U.u_inner, cur.inner);
-      gl.uniform1f(U.u_mix, cur.mix);
-      gl.uniform3f(U.u_colA, pal[0][0], pal[0][1], pal[0][2]);
-      gl.uniform3f(U.u_colB, pal[1][0], pal[1][1], pal[1][2]);
-      gl.uniform1f(U.u_seed, seed);
-      gl.uniform2f(U.u_par, cur.par[0], cur.par[1]);
-      gl.uniform1f(U.u_radius, radius);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-    }
-  };
-}
-
-/* ---------- Сущности (суб-орбы) ---------- */
+/* ---------- Сущности ---------- */
 const ENTITIES = {
-  strateg:  { name:'СТРАТЕГ',  hint:'планы, решения, порядок действий',
-    pal:[[0.45,0.30,1.00],[0.95,0.40,1.00]],
+  strateg:  { name:'СТРАТЕГ',  hint:'планы, решения, порядок действий', sigil: 0,
+    pal:[[0.30,0.18,0.85],[0.85,0.30,1.00]],
     sys:'Ты — Стратег, малый орб свиты Тайменя. Твоя стихия — планы, приоритеты, порядок действий. Отвечай по-русски, структурно и коротко: шаги, варианты, риски.' },
-  analitik: { name:'АНАЛИТИК', hint:'числа, данные, разбор по косточкам',
-    pal:[[0.10,0.80,0.85],[0.20,1.00,0.55]],
+  analitik: { name:'АНАЛИТИК', hint:'числа, данные, разбор по косточкам', sigil: 1,
+    pal:[[0.05,0.55,0.60],[0.15,0.95,0.55]],
     sys:'Ты — Аналитик, малый орб свиты Тайменя. Твоя стихия — числа, данные, логический разбор. Отвечай по-русски, точно и без воды, показывай ход рассуждения кратко.' },
-  pisar:    { name:'ПИСАРЬ',   hint:'тексты, письма, формулировки',
-    pal:[[1.00,0.70,0.20],[1.00,0.35,0.15]],
+  pisar:    { name:'ПИСАРЬ',   hint:'тексты, письма, формулировки', sigil: 2,
+    pal:[[0.85,0.45,0.10],[1.00,0.25,0.12]],
     sys:'Ты — Писарь, малый орб свиты Тайменя. Твоя стихия — тексты: письма, посты, формулировки. Отвечай по-русски, пиши живо и по делу, давай готовый текст.' },
-  hranitel: { name:'ХРАНИТЕЛЬ', hint:'память, заметки, что было раньше',
-    pal:[[0.30,0.90,0.45],[0.80,1.00,0.30]],
+  hranitel: { name:'ХРАНИТЕЛЬ', hint:'память, заметки, что было раньше', sigil: 3,
+    pal:[[0.12,0.60,0.30],[0.55,0.95,0.25]],
     sys:'Ты — Хранитель, малый орб свиты Тайменя. Твоя стихия — память: заметки, факты, история разговоров. Отвечай по-русски коротко; помогай вспоминать и решать, что стоит запомнить.' },
 };
+const ENT_ORDER = ['strateg', 'analitik', 'pisar', 'hranitel'];
 
-const MOODS = { // тег -> валентность (холод..тепло), возбуждение, слово в HUD
+const MOODS = {
   calm:    { v:-0.5, a:0.15, w:'спокоен' },
   warm:    { v: 0.35,a:0.30, w:'теплеет' },
   focus:   { v:-0.10,a:0.50, w:'собран' },
@@ -373,22 +400,14 @@ const TAIMEN_SYS_BASE =
 
 В САМОМ КОНЦЕ каждого ответа добавь тег настроения строго в формате [[mood:X]], где X одно из: calm, warm, focus, excited, deep, alarm. Выбирай по смыслу разговора; в обычной беседе чаще calm/warm — не изображай бурю без причины.
 
-У тебя есть свита малых орбов-помощников. Если задача явно по их части, добавь в конец ещё один тег [[orb:ID]]: strateg — планы и решения; analitik — числа и данные; pisar — тексты и письма; hranitel — память и заметки. НЕ добавляй [[orb:...]] без явной надобности.`;
+У тебя есть свита малых орбов-помощников, отпочковавшихся от тебя. Если задача явно по части одного из них — он может вступить в разговор: добавь в конец тег [[orb:ID]]: strateg — планы и решения; analitik — числа и данные; pisar — тексты и письма; hranitel — память и заметки. НЕ добавляй [[orb:...]] без явной надобности.`;
 
 /* ---------- Состояние ---------- */
 const S = {
-  state: 'idle',            // idle | listening | thinking | speaking
-  mood: { v:-0.5, a:0.15, w:'спокоен' },
-  activeEntity: null,
-  history: [],              // {role, content} для API
-  knowledge: [],            // {id, name, text, ts}
-  notes: [],                // строки — что Таймень запомнил сам
-  voiceOut: true,
-  userTurns: 0,
-  persistent: false,
-  booted: false,
+  state: 'idle', mood: MOODS.calm, activeEntity: null,
+  history: [], knowledge: [], notes: [],
+  voiceOut: true, userTurns: 0, persistent: false, booted: false,
 };
-
 const $ = (id) => document.getElementById(id);
 const logEl = $('log');
 
@@ -405,116 +424,397 @@ function say(role, text, cls){
   logEl.scrollTop = logEl.scrollHeight;
   while (logEl.children.length > 60) logEl.removeChild(logEl.firstChild);
 }
-
 function setStatus(state){
   S.state = state;
   const words = { idle:'дремлет', listening:'слушаю', thinking:'думает', speaking:'говорит' };
   $('status').textContent = words[state] || state;
-  const dot = $('status-dot');
   const colors = { idle:'#6ea8ff', listening:'#ff7a6e', thinking:'#b98bff', speaking:'#7dffc8' };
+  const dot = $('status-dot');
   dot.style.background = colors[state]; dot.style.boxShadow = '0 0 8px ' + colors[state];
   $('moodword').textContent = '· ' + S.mood.w;
 }
 
-/* ---------- Рендер: главный орб + свита ---------- */
-const mainOrb = makeOrb($('orb'), [[0.15,0.42,1.0],[1.0,0.24,0.18]], 3.7, 0.30);
-const dockEl = $('dock');
-const minis = {};
-for (const id of Object.keys(ENTITIES)){
-  const e = ENTITIES[id];
-  const wrap = document.createElement('div');
-  wrap.className = 'ent'; wrap.id = 'ent-' + id; wrap.title = e.hint;
-  const cv = document.createElement('canvas');
-  const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = e.name;
-  wrap.appendChild(cv); wrap.appendChild(nm); dockEl.appendChild(wrap);
-  minis[id] = makeOrb(cv, e.pal, 1 + Object.keys(minis).length * 2.13, 0.36);
-  wrap.addEventListener('click', () => toggleEntity(id));
-}
-
-let micLevel = 0, speechEnv = 0;
-function tickTargets(t){
-  if (!mainOrb) return;
-  const m = S.mood, T = mainOrb.tgt;
-  const breath = 0.03 + 0.018 * Math.sin(t * 0.7);
-  if (S.state === 'idle'){
-    T.amp = 0.018 + m.a * 0.02; T.flow = 0.5 + m.a * 0.5; T.inner = 0.24 + m.a * 0.12; T.pulse = breath;
-  } else if (S.state === 'listening'){
-    const lvl = micLevel > 0.05 ? micLevel : 0; // шумовой затвор: не дёргаться от тишины
-    T.amp = 0.03 + m.a * 0.02; T.flow = 0.9; T.inner = 0.34; T.pulse = breath + lvl * 1.2;
-  } else if (S.state === 'thinking'){
-    T.amp = 0.05; T.flow = 2.4; T.inner = 0.48; T.pulse = 0.16 + 0.09 * Math.sin(t * 4.2);
-  } else if (S.state === 'speaking'){
-    T.amp = 0.038 + m.a * 0.02; T.flow = 1.2; T.inner = 0.52; T.pulse = breath + speechEnv;
-    speechEnv *= 0.88;
+/* ---------- Кельтские сигилы (атлас-текстура) ---------- */
+function buildSigilAtlas(){
+  const cv = document.createElement('canvas'); cv.width = cv.height = 768;
+  const g = cv.getContext('2d');
+  g.clearRect(0, 0, 768, 768);
+  g.strokeStyle = 'rgba(255,255,255,1)'; g.lineCap = 'round';
+  function tile(i, fn){
+    const s = 256, x0 = (i % 3) * s, y0 = Math.floor(i / 3) * s;
+    g.save(); g.translate(x0 + s/2, y0 + s/2);
+    g.shadowColor = 'rgba(255,255,255,0.9)'; g.shadowBlur = 10; g.lineWidth = 9;
+    fn(g, s * 0.33); g.restore();
   }
-  T.mix = 0.5 + m.v * 0.38;
+  tile(0, (g, r) => { // триквестра — Стратег
+    for (let k = 0; k < 3; k++){
+      const a = k * 2.0944 - Math.PI/2;
+      g.beginPath();
+      g.arc(Math.cos(a)*r*0.58, Math.sin(a)*r*0.58, r*0.95, a + 2.6, a + 2.6 + 2.2);
+      g.stroke();
+    }
+    g.beginPath(); g.arc(0, 0, r*1.25, 0, 7); g.stroke();
+  });
+  tile(1, (g, r) => { // трискелион — Аналитик
+    for (let k = 0; k < 3; k++){
+      const a0 = k * 2.0944;
+      g.beginPath();
+      for (let i = 0; i <= 40; i++){
+        const tt = i/40, a = a0 + tt*4.2, rr = r*1.15*(1 - tt*0.92);
+        const x = Math.cos(a)*rr, y = Math.sin(a)*rr;
+        i ? g.lineTo(x, y) : g.moveTo(x, y);
+      }
+      g.stroke();
+    }
+  });
+  tile(2, (g, r) => { // кельтский крест — Писарь
+    g.beginPath(); g.arc(0, 0, r*0.85, 0, 7); g.stroke();
+    g.beginPath(); g.moveTo(0, -r*1.35); g.lineTo(0, r*1.35); g.stroke();
+    g.beginPath(); g.moveTo(-r*1.1, 0); g.lineTo(r*1.1, 0); g.stroke();
+  });
+  tile(3, (g, r) => { // узел-плетёнка — Хранитель
+    for (let k = 0; k < 2; k++){
+      g.save(); g.rotate(k * Math.PI/2);
+      g.beginPath();
+      g.ellipse(0, 0, r*1.25, r*0.5, Math.PI/4, 0, 7);
+      g.stroke(); g.restore();
+    }
+    g.beginPath(); g.arc(0, 0, r*0.35, 0, 7); g.stroke();
+  });
+  return cv;
+}
 
-  for (const id of Object.keys(minis)){
-    const mo = minis[id]; if (!mo) continue;
-    const el = $('ent-' + id);
-    const active = S.activeEntity === id, sug = el.classList.contains('suggested');
-    mo.tgt.amp = active ? 0.06 : sug ? 0.05 : 0.025;
-    mo.tgt.flow = active ? 1.8 : sug ? 1.4 : 0.4;
-    mo.tgt.inner = active ? 0.45 : 0.18;
-    mo.tgt.pulse = active ? (S.state === 'speaking' ? speechEnv + 0.1 : 0.15) : (sug ? 0.2 + 0.15 * Math.sin(t*3.0) : 0.03);
-    mo.tgt.mix = 0.5;
+/* ---------- 3D сцена ---------- */
+const canvas = $('orb');
+const gl = canvas.getContext('webgl', { alpha: false, antialias: false });
+let scene = null;
+
+function initScene(){
+  if (!gl) return null;
+  function sh(type, src){
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)){ console.warn(gl.getShaderInfoLog(s)); return null; }
+    return s;
   }
+  const prog = gl.createProgram();
+  const vs = sh(gl.VERTEX_SHADER, VERT), fs = sh(gl.FRAGMENT_SHADER, FRAG);
+  if (!vs || !fs) return null;
+  gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)){ console.warn(gl.getProgramInfoLog(prog)); return null; }
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'p');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, buildSigilAtlas());
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  const U = {};
+  ['u_res','u_time','u_camPos','u_camFwd','u_camRight','u_camUp','u_count','u_posRad','u_style','u_misc','u_colA','u_colB','u_tex']
+    .forEach(n => U[n] = gl.getUniformLocation(prog, n));
+  gl.uniform1i(U.u_tex, 0);
+  return { prog, U };
+}
+scene = initScene();
+
+/* орбы */
+const orbs = []; // {entId|null, level, slot, birthT, pos[3], rad, radT, style:{cur,tgt}, seed, sigil, sigVis, parent}
+function mkStyle(){ return { cur:{flow:.5, amp:.03, pulse:.05, inner:.2}, tgt:{flow:.5, amp:.03, pulse:.05, inner:.2} }; }
+orbs.push({ entId: null, level: 0, slot: -1, birthT: -10, pos: [0,0,0], rad: 1.0, radT: 1.0,
+  style: mkStyle(), seed: 3.7, sigil: -1, sigVis: 0, parent: -1,
+  palA: [0.15,0.42,1.0], palB: [1.0,0.24,0.18] });
+
+function spawnOrb(entId, parentIdx, level){
+  if (orbs.length >= MAXO) return null;
+  const e = ENTITIES[entId];
+  const slot = orbs.filter(o => o.level === 1).length;
+  const o = {
+    entId, level: level || 1, slot, birthT: tNow(), parent: parentIdx || 0,
+    pos: orbs[parentIdx || 0].pos.slice(), rad: 0.01,
+    radT: level === 2 ? 0.20 : 0.42,
+    style: mkStyle(), seed: 1.3 + orbs.length * 2.17,
+    sigil: e.sigil, sigVis: 0, palA: e.pal[0], palB: e.pal[1],
+    phase: Math.random() * 6.28,
+  };
+  orbs.push(o);
+  ensureLabel(o);
+  return o;
 }
 
-let t0 = performance.now();
-function frame(){
-  const t = (performance.now() - t0) / 1000;
-  const speed = S.state === 'idle' ? 0.55 : 1.0;
-  tickTargets(t);
-  if (mainOrb) mainOrb.render(t * speed);
-  for (const id of Object.keys(minis)) if (minis[id]) minis[id].render(t * 0.8 + 5);
-  requestAnimationFrame(frame);
+/* подписи */
+function ensureLabel(o){
+  if (!o.entId || o.level !== 1) return;
+  if ($('ent-' + o.entId)) return;
+  const d = document.createElement('div');
+  d.className = 'entlabel'; d.id = 'ent-' + o.entId;
+  d.textContent = ENTITIES[o.entId].name; d.title = ENTITIES[o.entId].hint;
+  d.addEventListener('click', () => toggleEntity(o.entId));
+  $('labels').appendChild(d);
 }
-requestAnimationFrame(frame);
 
-/* параллакс */
-window.addEventListener('pointermove', (e) => {
-  if (!mainOrb) return;
-  mainOrb.tgt.par[0] = (e.clientX / window.innerWidth - 0.5) * 2;
-  mainOrb.tgt.par[1] = -(e.clientY / window.innerHeight - 0.5) * 2;
+/* камера */
+const cam = { yaw: 0.35, pitch: 0.34, dist: 5.4, target: [0, 0.05, 0],
+  goalDist: 5.4, goalTarget: [0, 0.05, 0], focus: -1 };
+function tNow(){ return (performance.now() - t0) / 1000; }
+function camBasis(){
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
+  const fwd = [ -sy*cp, -sp, -cy*cp ];
+  const pos = [ cam.target[0] - fwd[0]*cam.dist, cam.target[1] - fwd[1]*cam.dist, cam.target[2] - fwd[2]*cam.dist ];
+  const right = [ cy, 0, -sy ];
+  const up = [ fwd[1]*right[2] - fwd[2]*right[1], fwd[2]*right[0] - fwd[0]*right[2], fwd[0]*right[1] - fwd[1]*right[0] ];
+  const nu = Math.hypot(up[0], up[1], up[2]) || 1;
+  return { pos, fwd, right, up: [ -up[0]/nu, -up[1]/nu, -up[2]/nu ] };
+}
+
+/* ввод: облёт, зум, тап */
+let dragging = false, moved = 0, px = 0, py = 0, pinch0 = 0, pinchD0 = 0;
+const pointers = new Map();
+canvas.addEventListener('pointerdown', (e) => {
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  dragging = true; moved = 0; px = e.clientX; py = e.clientY;
+  canvas.classList.add('drag');
+  canvas.setPointerCapture(e.pointerId);
 });
-if (window.DeviceOrientationEvent){
-  window.addEventListener('deviceorientation', (e) => {
-    if (!mainOrb || e.gamma == null) return;
-    mainOrb.tgt.par[0] = Math.max(-1, Math.min(1, e.gamma / 30));
-    mainOrb.tgt.par[1] = Math.max(-1, Math.min(1, (e.beta - 45) / 30));
+canvas.addEventListener('pointermove', (e) => {
+  if (!dragging) return;
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pointers.size === 2){
+    const pts = [...pointers.values()];
+    const d = Math.hypot(pts[0][0]-pts[1][0], pts[0][1]-pts[1][1]);
+    if (!pinch0){ pinch0 = d; pinchD0 = cam.goalDist; }
+    cam.goalDist = Math.min(9, Math.max(1.4, pinchD0 * pinch0 / Math.max(d, 20)));
+    return;
+  }
+  const dx = e.clientX - px, dy = e.clientY - py;
+  moved += Math.abs(dx) + Math.abs(dy);
+  px = e.clientX; py = e.clientY;
+  cam.yaw -= dx * 0.005;
+  cam.pitch = Math.min(1.2, Math.max(-1.2, cam.pitch + dy * 0.005));
+});
+function endPointer(e){
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch0 = 0;
+  if (pointers.size === 0){
+    canvas.classList.remove('drag');
+    if (dragging && moved < 7) clickScene(e.clientX, e.clientY);
+    dragging = false;
+  }
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  cam.goalDist = Math.min(9, Math.max(1.4, cam.goalDist * (1 + Math.sign(e.deltaY) * 0.12)));
+}, { passive: false });
+
+function clickScene(cx, cy){
+  const b = camBasis();
+  const ndx = (cx - window.innerWidth/2) / window.innerHeight * 2;
+  const ndy = -(cy - window.innerHeight/2) / window.innerHeight * 2;
+  const rd = [
+    b.fwd[0]*1.6 + b.right[0]*ndx + b.up[0]*ndy,
+    b.fwd[1]*1.6 + b.right[1]*ndx + b.up[1]*ndy,
+    b.fwd[2]*1.6 + b.right[2]*ndx + b.up[2]*ndy ];
+  const l = Math.hypot(rd[0], rd[1], rd[2]); rd[0]/=l; rd[1]/=l; rd[2]/=l;
+  let hit = -1, best = 1e9;
+  orbs.forEach((o, i) => {
+    const oc = [ b.pos[0]-o.pos[0], b.pos[1]-o.pos[1], b.pos[2]-o.pos[2] ];
+    const bq = oc[0]*rd[0] + oc[1]*rd[1] + oc[2]*rd[2];
+    const cq = oc[0]*oc[0] + oc[1]*oc[1] + oc[2]*oc[2] - o.rad*o.rad*1.2;
+    const disc = bq*bq - cq;
+    if (disc > 0){ const tq = -bq - Math.sqrt(disc); if (tq > 0 && tq < best){ best = tq; hit = i; } }
+  });
+  if (hit > 0 && orbs[hit].entId && orbs[hit].level === 1) toggleEntity(orbs[hit].entId);
+  else if (hit === 0 && S.activeEntity) toggleEntity(S.activeEntity);
+}
+
+/* фокус камеры */
+function focusOrb(i){
+  cam.focus = i;
+  cam.goalDist = i <= 0 ? 4.8 : Math.max(1.6, orbs[i].rad * 5.2);
+}
+
+/* ---------- Персональность: цели анимации ---------- */
+let micLevel = 0, speechEnv = 0;
+function lerp(a, b, k){ return a + (b - a) * k; }
+function easeOut(x){ return 1 - Math.pow(1 - Math.min(Math.max(x, 0), 1), 3); }
+
+function tickOrbs(t){
+  const m = S.mood;
+  const breath = 0.04 + 0.02 * Math.sin(t * 0.7);
+  // главный
+  const T0 = orbs[0].style.tgt;
+  if (S.state === 'idle'){ T0.amp = 0.020 + m.a*0.02; T0.flow = 0.5 + m.a*0.5; T0.inner = 0.24 + m.a*0.12; T0.pulse = breath; }
+  else if (S.state === 'listening'){ const lvl = micLevel > 0.05 ? micLevel : 0; T0.amp = 0.032 + m.a*0.02; T0.flow = 0.9; T0.inner = 0.34; T0.pulse = breath + lvl*1.2; }
+  else if (S.state === 'thinking'){ T0.amp = 0.05; T0.flow = 2.4; T0.inner = 0.48; T0.pulse = 0.16 + 0.09*Math.sin(t*4.2); }
+  else if (S.state === 'speaking'){ T0.amp = 0.04 + m.a*0.02; T0.flow = 1.2; T0.inner = 0.52; T0.pulse = breath + speechEnv; speechEnv *= 0.88; }
+  const mix = 0.5 + m.v * 0.42;
+  const coolA = [0.12,0.38,1.0], coolB = [0.55,0.30,1.0], warmA = [1.0,0.35,0.12], warmB = [1.0,0.15,0.35];
+  orbs[0].palA = [ lerp(coolA[0], warmA[0], mix), lerp(coolA[1], warmA[1], mix), lerp(coolA[2], warmA[2], mix) ];
+  orbs[0].palB = [ lerp(coolB[0], warmB[0], mix), lerp(coolB[1], warmB[1], mix), lerp(coolB[2], warmB[2], mix) ];
+
+  // позиции: главный плавает
+  orbs[0].pos = [ Math.sin(t*0.43)*0.06, Math.cos(t*0.31)*0.06, Math.sin(t*0.23)*0.04 ];
+
+  orbs.forEach((o, i) => {
+    if (i === 0) return;
+    const birth = Math.min((t - o.birthT) / 2.8, 1);
+    const eb = easeOut(birth);
+    o.rad = o.radT * (0.10 + 0.90 * eb);
+    o.k = lerp(orbs[o.parent].rad * 0.9, 0.02, Math.min(Math.max((birth - 0.45) / 0.5, 0), 1));
+    let slotPos;
+    if (o.level === 1){
+      const a = o.slot * Math.PI/2 + t * 0.05;
+      slotPos = [ Math.cos(a)*2.5, Math.sin(t*0.5 + o.phase)*0.14, Math.sin(a)*2.5 ];
+    } else {
+      const pp = orbs[o.parent].pos, a2 = t*0.45 + o.phase;
+      slotPos = [ pp[0] + Math.cos(a2)*0.8, pp[1] + Math.sin(t*0.8 + o.phase)*0.15, pp[2] + Math.sin(a2)*0.8 ];
+    }
+    const pp = orbs[o.parent].pos;
+    o.pos = [ lerp(pp[0], slotPos[0], eb), lerp(pp[1], slotPos[1], eb), lerp(pp[2], slotPos[2], eb) ];
+
+    // характер
+    const el = o.entId && $('ent-' + o.entId);
+    const active = o.entId && S.activeEntity === o.entId && o.level === 1;
+    const sug = el && el.classList.contains('suggested');
+    const T = o.style.tgt;
+    T.amp = active ? 0.05 : sug ? 0.045 : 0.022;
+    T.flow = active ? 1.8 : sug ? 1.4 : 0.45;
+    T.inner = active ? 0.45 : 0.18;
+    T.pulse = active ? (S.state === 'speaking' ? speechEnv + 0.1 : 0.14) : (sug ? 0.2 + 0.14*Math.sin(t*3.0) : 0.04);
+    // сигил дышит: изредка проступает; при активности — держится
+    if (active) o.sigVis = lerp(o.sigVis, 0.75, 0.03);
+    else if (sug) o.sigVis = lerp(o.sigVis, 0.9, 0.05);
+    else {
+      const cyc = Math.sin(t * 0.11 + o.phase * 3.1);
+      o.sigVis = lerp(o.sigVis, cyc > 0.86 ? 0.55 : 0.0, 0.02);
+    }
+  });
+
+  // камера
+  if (cam.focus >= 0 && cam.focus < orbs.length){
+    const fo = orbs[cam.focus];
+    cam.goalTarget = cam.focus === 0 ? [0, 0.05, 0] : fo.pos;
+  }
+  cam.target[0] = lerp(cam.target[0], cam.goalTarget[0], 0.04);
+  cam.target[1] = lerp(cam.target[1], cam.goalTarget[1], 0.04);
+  cam.target[2] = lerp(cam.target[2], cam.goalTarget[2], 0.04);
+  cam.dist = lerp(cam.dist, cam.goalDist, 0.05);
+}
+
+/* upload + draw */
+const fPosRad = new Float32Array(MAXO*4), fStyle = new Float32Array(MAXO*4),
+      fMisc = new Float32Array(MAXO*4), fColA = new Float32Array(MAXO*3), fColB = new Float32Array(MAXO*3);
+function draw(t){
+  if (!scene) return;
+  const RES = window.innerWidth < 700 ? 0.55 : 0.72;
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.6);
+  const w = Math.round(canvas.clientWidth * dpr * RES), h = Math.round(canvas.clientHeight * dpr * RES);
+  if (canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h); }
+
+  orbs.forEach((o, i) => {
+    const c = o.style.cur, g = o.style.tgt;
+    c.flow = lerp(c.flow, g.flow, .04); c.amp = lerp(c.amp, g.amp, .05);
+    c.pulse = lerp(c.pulse, g.pulse, .28); c.inner = lerp(c.inner, g.inner, .05);
+    fPosRad.set([o.pos[0], o.pos[1], o.pos[2], o.rad], i*4);
+    fStyle.set([c.flow, c.amp, c.pulse, c.inner], i*4);
+    fMisc.set([o.k || 0.02, o.seed, o.sigil < 0 ? 0 : o.sigil, o.sigil < 0 ? 0 : o.sigVis], i*4);
+    fColA.set(o.palA, i*3); fColB.set(o.palB, i*3);
+  });
+  const b = camBasis();
+  const U = scene.U;
+  gl.uniform2f(U.u_res, w, h);
+  gl.uniform1f(U.u_time, t);
+  gl.uniform3f(U.u_camPos, b.pos[0], b.pos[1], b.pos[2]);
+  gl.uniform3f(U.u_camFwd, b.fwd[0], b.fwd[1], b.fwd[2]);
+  gl.uniform3f(U.u_camRight, b.right[0], b.right[1], b.right[2]);
+  gl.uniform3f(U.u_camUp, b.up[0], b.up[1], b.up[2]);
+  gl.uniform1i(U.u_count, orbs.length);
+  gl.uniform4fv(U.u_posRad, fPosRad);
+  gl.uniform4fv(U.u_style, fStyle);
+  gl.uniform4fv(U.u_misc, fMisc);
+  gl.uniform3fv(U.u_colA, fColA);
+  gl.uniform3fv(U.u_colB, fColB);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+/* подписи в экранных координатах */
+function placeLabels(){
+  const b = camBasis();
+  orbs.forEach((o) => {
+    if (!o.entId || o.level !== 1) return;
+    const el = $('ent-' + o.entId); if (!el) return;
+    const wp = [ o.pos[0], o.pos[1] + o.rad*1.5, o.pos[2] ];
+    const rel = [ wp[0]-b.pos[0], wp[1]-b.pos[1], wp[2]-b.pos[2] ];
+    const z = rel[0]*b.fwd[0] + rel[1]*b.fwd[1] + rel[2]*b.fwd[2];
+    if (z < 0.3){ el.style.display = 'none'; return; }
+    const x = rel[0]*b.right[0] + rel[1]*b.right[1] + rel[2]*b.right[2];
+    const y = rel[0]*b.up[0] + rel[1]*b.up[1] + rel[2]*b.up[2];
+    el.style.display = 'block';
+    el.style.left = (window.innerWidth/2 + (x/z)*1.6/2 * window.innerHeight) + 'px';
+    el.style.top  = (window.innerHeight/2 - (y/z)*1.6/2 * window.innerHeight) + 'px';
+    el.style.opacity = String(Math.min(1, 6/z));
   });
 }
 
-/* ---------- Сущности: активация и подсказки ---------- */
+let t0 = performance.now();
+(function frame(){
+  const t = tNow();
+  tickOrbs(t);
+  draw(t);
+  placeLabels();
+  requestAnimationFrame(frame);
+})();
+
+/* ---------- Сущности: активация, вступление ---------- */
 function toggleEntity(id){
-  const el = $('ent-' + id);
+  const el = $('ent-' + id); if (!el) return;
   el.classList.remove('suggested');
+  const idx = orbs.findIndex(o => o.entId === id && o.level === 1);
   if (S.activeEntity === id){
     S.activeEntity = null;
     el.classList.remove('active');
     $('active-entity').style.display = 'none';
+    focusOrb(0);
     say('sys', '↩ снова говорит сам Таймень');
   } else {
-    if (S.activeEntity) $('ent-' + S.activeEntity).classList.remove('active');
+    if (S.activeEntity){ const p = $('ent-' + S.activeEntity); if (p) p.classList.remove('active'); }
     S.activeEntity = id;
     el.classList.add('active');
     const ae = $('active-entity');
     ae.textContent = '◈ на связи: ' + ENTITIES[id].name;
     ae.style.display = 'block';
+    if (idx > 0) focusOrb(idx);
     say('sys', '◈ ' + ENTITIES[id].name + ' слушает (' + ENTITIES[id].hint + ')');
   }
 }
 function suggestEntity(id){
   const e = ENTITIES[id]; if (!e) return;
+  let idx = orbs.findIndex(o => o.entId === id && o.level === 1);
+  if (idx < 0){ spawnOrb(id, 0, 1); idx = orbs.length - 1; }
   const el = $('ent-' + id);
-  if (S.activeEntity !== id){
+  if (S.activeEntity !== id && el){
     el.classList.add('suggested');
-    say('sys', '✦ ' + e.name + ' подплыл ближе: ' + e.hint + ' — коснись его орба, чтобы передать слово');
+    say('sys', '✦ ' + e.name + ' вступает: ' + e.hint + ' — тап по его шару, чтобы передать слово');
     setTimeout(() => el.classList.remove('suggested'), 45000);
   }
+  // если сейчас говорит другая сущность — младший помощник почкуется от неё
+  if (S.activeEntity && S.activeEntity !== id && orbs.length < MAXO){
+    const pIdx = orbs.findIndex(o => o.entId === S.activeEntity && o.level === 1);
+    if (pIdx > 0 && !orbs.some(o => o.level === 2 && o.entId === id && o.parent === pIdx)){
+      spawnOrb(id, pIdx, 2);
+    }
+  }
 }
-$('orb').addEventListener('click', () => { if (S.activeEntity) toggleEntity(S.activeEntity); });
 
 /* ---------- Память ---------- */
 function persistLocal(){
@@ -523,12 +823,11 @@ function persistLocal(){
       notes: S.notes, knowledge: S.knowledge, voiceOut: S.voiceOut,
       history: S.history.slice(-16), ts: Date.now(),
     }));
-  } catch { /* приватный режим и т.п. */ }
+  } catch { /* ok */ }
 }
 let gitTimer = null;
 function persist(){
-  persistLocal();
-  updateMemUi();
+  persistLocal(); updateMemUi();
   if (!S.persistent) return;
   clearTimeout(gitTimer);
   gitTimer = setTimeout(() => {
@@ -541,14 +840,13 @@ function persist(){
 function updateMemUi(){
   $('memcount').textContent = String(S.notes.length + S.knowledge.length);
   $('memmode').textContent = S.persistent ? 'git' : 'локальная';
-  const n = $('notes');
-  n.textContent = '';
+  const n = $('notes'); n.textContent = '';
   if (!S.notes.length){ n.textContent = 'пока ничего'; }
   else S.notes.forEach((note, i) => {
     const d = document.createElement('div'); d.className = 'kitem';
     const s = document.createElement('span'); s.textContent = '· ' + note;
     const x = document.createElement('span'); x.className = 'kx'; x.textContent = '✕';
-    x.onclick = () => { S.notes.splice(i,1); persist(); };
+    x.onclick = () => { S.notes.splice(i, 1); persist(); };
     d.appendChild(s); d.appendChild(x); n.appendChild(d);
   });
 }
@@ -566,17 +864,16 @@ async function loadMemory(){
       const j = await res.json();
       S.persistent = !!j.persistent;
       if (j.data){
-        // git — источник истины для заметок и знаний
         if (Array.isArray(j.data.notes)) S.notes = j.data.notes;
         if (Array.isArray(j.data.knowledge)) S.knowledge = j.data.knowledge;
       }
     }
-  } catch { /* локальный запуск без функций */ }
+  } catch { /* локальный запуск */ }
   updateMemUi(); renderKnowledge();
   $('spk').classList.toggle('on', S.voiceOut);
 }
 
-/* ---------- Знания (скармливание) ---------- */
+/* ---------- Знания ---------- */
 function renderKnowledge(){
   const kl = $('klist'); kl.textContent = '';
   S.knowledge.forEach((k, i) => {
@@ -584,7 +881,7 @@ function renderKnowledge(){
     const s = document.createElement('span');
     s.textContent = k.name + ' · ' + Math.round(k.text.length/100)/10 + 'k';
     const x = document.createElement('span'); x.className = 'kx'; x.textContent = '✕';
-    x.onclick = () => { S.knowledge.splice(i,1); renderKnowledge(); persist(); };
+    x.onclick = () => { S.knowledge.splice(i, 1); renderKnowledge(); persist(); };
     d.appendChild(s); d.appendChild(x); kl.appendChild(d);
   });
 }
@@ -623,10 +920,10 @@ window.addEventListener('drop', (e) => {
 /* ---------- Мозг ---------- */
 function buildSystem(){
   let sys = S.activeEntity ? ENTITIES[S.activeEntity].sys +
-    '\n\nВ конце ответа добавь тег [[mood:X]] (calm, warm, focus, excited, deep, alarm).' : TAIMEN_SYS_BASE;
+    '\n\nВ конце ответа добавь тег [[mood:X]] (calm, warm, focus, excited, deep, alarm). Если задача явно по части другого помощника (strateg, analitik, pisar, hranitel) — добавь [[orb:ID]].' : TAIMEN_SYS_BASE;
   if (S.notes.length) sys += '\n\nЧто ты помнишь о хозяине и его делах:\n' + S.notes.map(n => '- ' + n).join('\n');
   if (S.knowledge.length){
-    let budget = 6000, chunks = [];
+    let budget = 6000; const chunks = [];
     for (let i = S.knowledge.length - 1; i >= 0 && budget > 200; i--){
       const k = S.knowledge[i];
       const piece = k.text.slice(0, Math.min(k.text.length, budget));
@@ -637,7 +934,6 @@ function buildSystem(){
   }
   return sys;
 }
-
 async function callBrain(messages, opts){
   const res = await fetch('/api/chat', {
     method: 'POST', headers: { 'content-type': 'application/json' },
@@ -651,7 +947,6 @@ async function callBrain(messages, opts){
   if (!res.ok) throw new Error(j.error || ('ошибка ' + res.status));
   return j.text || '';
 }
-
 function parseTags(text){
   const out = { text, mood: null, orb: null };
   out.text = text.replace(/\[\[(mood|orb):\s*([a-zA-Z_]+)\s*\]\]/g, (_, kind, val) => {
@@ -682,7 +977,7 @@ async function sendMessage(text){
     if (S.userTurns % 6 === 0) distill();
   } catch (e) {
     S.mood = MOODS.alarm;
-    say('sys', '✕ ' + (e && e.message || 'связь прервалась'), 'sys err');
+    say('sys', '✕ ' + ((e && e.message) || 'связь прервалась'), 'sys err');
     setTimeout(() => { S.mood = MOODS.calm; setStatus(S.state); }, 4000);
   } finally {
     busy = false;
@@ -691,7 +986,6 @@ async function sendMessage(text){
   }
 }
 
-/* самообучение: раз в 6 реплик дистиллируем факты дешёвой моделью */
 async function distill(){
   try {
     const transcript = S.history.slice(-12).map(m => (m.role === 'user' ? 'Хозяин: ' : 'Таймень: ') + m.content).join('\n');
@@ -712,14 +1006,13 @@ async function distill(){
     }
     while (S.notes.length > 40) S.notes.shift();
     persist();
-  } catch { /* фоновая задача — молчим */ }
+  } catch { /* фон */ }
 }
 
-/* ---------- Голос: слух ---------- */
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+/* ---------- Слух ---------- */
+const SRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recog = null, audioCtx = null, analyser = null, micStream = null;
-if (!SR) { $('mic').style.display = 'none'; }
-
+if (!SRec) { $('mic').style.display = 'none'; }
 async function micMeterOn(){
   try {
     if (!navigator.mediaDevices) return;
@@ -738,17 +1031,16 @@ async function micMeterOn(){
       micLevel = Math.min(1, Math.sqrt(sum / buf.length) * 4);
       requestAnimationFrame(meter);
     })();
-  } catch { /* без микрофона — только текст */ }
+  } catch { /* только текст */ }
 }
 function micMeterOff(){
   micLevel = 0; analyser = null;
-  if (micStream){ micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (micStream){ micStream.getTracks().forEach(tr => tr.stop()); micStream = null; }
 }
-
 function startListening(){
-  if (!SR || S.state === 'listening') return;
+  if (!SRec || S.state === 'listening') return;
   try { window.speechSynthesis && speechSynthesis.cancel(); } catch { /* ok */ }
-  recog = new SR();
+  recog = new SRec();
   recog.lang = 'ru-RU'; recog.interimResults = true; recog.continuous = false;
   let finalText = '';
   recog.onresult = (e) => {
@@ -778,7 +1070,7 @@ function stopListening(){
 }
 $('mic').onclick = () => (S.state === 'listening' ? stopListening() : startListening());
 
-/* ---------- Голос: речь ---------- */
+/* ---------- Речь ---------- */
 let ruVoice = null;
 function pickVoice(){
   if (!window.speechSynthesis) return;
@@ -786,15 +1078,12 @@ function pickVoice(){
   ruVoice = vs.find(v => /ru/i.test(v.lang) && /милена|milena|dmitry|yuri|google/i.test(v.name)) ||
             vs.find(v => /ru/i.test(v.lang)) || null;
 }
-if (window.speechSynthesis){
-  pickVoice();
-  speechSynthesis.onvoiceschanged = pickVoice;
-}
+if (window.speechSynthesis){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 function speak(text){
-  if (!S.voiceOut || !window.speechSynthesis || !text) { setStatus('idle'); return; }
+  if (!S.voiceOut || !window.speechSynthesis || !text){ setStatus('idle'); return; }
   try {
     speechSynthesis.cancel();
-    const clean = text.replace(/[*_#`>\[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 800);
+    const clean = text.replace(/[*_#\`>\[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 800);
     const u = new SpeechSynthesisUtterance(clean);
     if (ruVoice) u.voice = ruVoice;
     u.lang = 'ru-RU'; u.rate = 1.0; u.pitch = 0.8;
@@ -808,7 +1097,7 @@ function speak(text){
 $('spk').onclick = () => {
   S.voiceOut = !S.voiceOut;
   $('spk').classList.toggle('on', S.voiceOut);
-  if (!S.voiceOut) { try { speechSynthesis.cancel(); } catch { /* ok */ } }
+  if (!S.voiceOut){ try { speechSynthesis.cancel(); } catch { /* ok */ } }
   persist();
 };
 
@@ -818,24 +1107,29 @@ $('inp').addEventListener('keydown', (e) => {
   if (e.key === 'Enter'){ sendMessage($('inp').value); $('inp').value = ''; }
 });
 
-/* ---------- Запуск ---------- */
-$('start').onclick = async () => {
+/* ---------- Запуск: помощники почкуются ---------- */
+$('start').onclick = () => {
   $('boot').classList.add('gone');
   S.booted = true;
-  // «прогрев» синтеза внутри жеста пользователя (iOS/Android)
   if (window.speechSynthesis){
     try { const u = new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); } catch { /* ok */ }
   }
   setStatus('idle');
+  // почкование свиты — по одному
+  ENT_ORDER.forEach((id, i) => setTimeout(() => spawnOrb(id, 0, 1), 900 + i * 1500));
   const greeting = S.history.length
     ? 'Я вынырнул. Помню, о чём мы говорили — продолжай.'
-    : 'Я здесь. Говори вслух или пиши — я слушаю глубину.';
+    : 'Я здесь. Смотри — свита рождается из меня. Говори вслух или пиши.';
   say('taimen', greeting);
   speak(greeting);
 };
 
 setStatus('idle');
 loadMemory();
+
+/* отладочный хук (демо/диагностика) */
+window.TAIMEN = { cam, orbs, S, spawnOrb, toggleEntity, setStatus, focusOrb,
+  pulse: (v) => { speechEnv = v; } };
 </script>
 </body>
 </html>
