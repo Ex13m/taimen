@@ -60,6 +60,12 @@ exports.handler = async (event) => {
   const repo = process.env.GITHUB_REPO || 'Ex13m/taimen';
   const branch = process.env.MEMORY_BRANCH || 'taimen-memory';
 
+  // Опциональный замок: с ACCESS_KEY чужие не читают и не пишут память.
+  const requiredKey = process.env.ACCESS_KEY;
+  if (requiredKey && event.headers['x-taimen-key'] !== requiredKey) {
+    return json(401, { error: 'Таймень закрыт паролем.', locked: true });
+  }
+
   if (event.httpMethod === 'GET') {
     if (!token) return json(200, { persistent: false, data: null });
     try {

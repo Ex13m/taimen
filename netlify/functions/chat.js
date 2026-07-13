@@ -43,6 +43,12 @@ exports.handler = async (event) => {
     return json(405, { error: 'Только POST.' });
   }
 
+  // Опциональный замок: если в ENV задан ACCESS_KEY, чужие без пароля не тратят токены.
+  const requiredKey = process.env.ACCESS_KEY;
+  if (requiredKey && event.headers['x-taimen-key'] !== requiredKey) {
+    return json(401, { error: 'Таймень закрыт паролем.', locked: true });
+  }
+
   const raw = event.body || '';
   if (Buffer.byteLength(raw, 'utf8') > MAX_BODY_BYTES) {
     return json(400, { error: 'Слишком большой запрос (лимит 32KB).' });

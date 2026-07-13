@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- ТАЙМЕНЬ v1.0.0 · © 2026 Ex13m. Все права защищены. -->
 <html lang="ru">
 <head>
 <meta charset="utf-8">
@@ -6,6 +7,8 @@
 <meta name="theme-color" content="#060318">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>ТАЙМЕНЬ</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%236ea8ff' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff4a3a' stroke-width='5' stroke-dasharray='40 100'/%3E%3C/svg%3E">
 <style>
@@ -163,6 +166,11 @@
     #knowbtn{ bottom: auto; top: calc(112px + env(safe-area-inset-top)); }
     #know{ bottom: auto; top: calc(164px + env(safe-area-inset-top)); max-height: 50vh; }
   }
+  @media (max-width: 420px){
+    #hud{ min-width: 0; max-width: 56vw; }
+    #hud h1{ font-size: 15px; letter-spacing: .25em; }
+    #memchip{ max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
 </style>
 </head>
 <body>
@@ -175,6 +183,7 @@
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · колесо/щипок — ближе · тап по шару — слово ему</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.0.0 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -268,7 +277,7 @@ float sdOrb(vec3 p, vec4 pr, float flow, float ampl, float pulse, float seed){
   float R = pr.w;
   float l = length(q);
   float base = l - R;
-  if (abs(base) < R*0.7){
+  if (abs(base) < R*0.5){
     vec3 dir = q / max(l, 1e-4);
     float t = u_time;
     float n1 = fbm3(dir*2.6 + seed + t*0.14*flow) - 0.5;
@@ -437,7 +446,13 @@ const S = {
   state: 'idle', mood: MOODS.calm, activeEntity: null,
   history: [], knowledge: [], notes: [],
   voiceOut: true, userTurns: 0, persistent: false, booted: false,
+  accessKey: '',
 };
+function apiHeaders(){
+  const h = { 'content-type': 'application/json' };
+  if (S.accessKey) h['x-taimen-key'] = S.accessKey;
+  return h;
+}
 const $ = (id) => document.getElementById(id);
 const logEl = $('log');
 
@@ -889,7 +904,7 @@ function persistLocal(){
   try {
     localStorage.setItem('taimen-v1', JSON.stringify({
       notes: S.notes, knowledge: S.knowledge, voiceOut: S.voiceOut,
-      history: S.history.slice(-16), ts: Date.now(),
+      history: S.history.slice(-16), ts: Date.now(), accessKey: S.accessKey,
     }));
   } catch { /* ok */ }
 }
@@ -900,7 +915,7 @@ function persist(){
   clearTimeout(gitTimer);
   gitTimer = setTimeout(() => {
     fetch('/api/memory', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: apiHeaders(),
       body: JSON.stringify({ data: { notes: S.notes, knowledge: S.knowledge, ts: Date.now() } }),
     }).catch(() => {});
   }, 8000);
@@ -924,10 +939,11 @@ async function loadMemory(){
     if (local){
       S.notes = local.notes || []; S.knowledge = local.knowledge || [];
       S.voiceOut = local.voiceOut !== false; S.history = local.history || [];
+      S.accessKey = local.accessKey || '';
     }
   } catch { /* ok */ }
   try {
-    const res = await fetch('/api/memory');
+    const res = await fetch('/api/memory', { headers: S.accessKey ? { 'x-taimen-key': S.accessKey } : {} });
     if (res.ok){
       const j = await res.json();
       S.persistent = !!j.persistent;
@@ -1004,7 +1020,7 @@ function buildSystem(){
 }
 async function callBrain(messages, opts){
   const res = await fetch('/api/chat', {
-    method: 'POST', headers: { 'content-type': 'application/json' },
+    method: 'POST', headers: apiHeaders(),
     body: JSON.stringify({
       messages, system: (opts && opts.system) || buildSystem(),
       model: (opts && opts.model) || (S.activeEntity ? 'claude-haiku-4-5' : 'claude-sonnet-4-6'),
@@ -1029,6 +1045,15 @@ let busy = false;
 async function sendMessage(text){
   text = (text || '').trim();
   if (!text || busy) return;
+  // ввод пароля прямо в чате: «пароль моёслово»
+  const pw = text.match(/^пароль[\s:]+(.+)$/i);
+  if (pw){
+    S.accessKey = pw[1].trim();
+    persistLocal();
+    say('sys', '🔑 пароль запомнен на этом устройстве — повтори свой вопрос');
+    loadMemory();
+    return;
+  }
   busy = true;
   $('send').textContent = '◌'; $('send').disabled = true;
   say('user', text);
@@ -1045,9 +1070,14 @@ async function sendMessage(text){
     speak(p.text);
     if (S.userTurns % 6 === 0) distill();
   } catch (e) {
-    S.mood = MOODS.alarm;
-    say('sys', '✕ ' + ((e && e.message) || 'связь прервалась'), 'sys err');
-    setTimeout(() => { S.mood = MOODS.calm; setStatus(S.state); }, 4000);
+    const msg = (e && e.message) || 'связь прервалась';
+    if (/паролем/.test(msg)){
+      say('sys', '🔒 Таймень закрыт. Напиши в чат: пароль ТВОЁСЛОВО');
+    } else {
+      S.mood = MOODS.alarm;
+      say('sys', '✕ ' + msg, 'sys err');
+      setTimeout(() => { S.mood = MOODS.calm; setStatus(S.state); }, 4000);
+    }
   } finally {
     busy = false;
     $('send').textContent = '➤'; $('send').disabled = false;
@@ -1210,6 +1240,11 @@ $('start').onclick = () => {
 
 setStatus('idle');
 loadMemory();
+
+/* PWA: офлайн-оболочка */
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 
 /* отладочный хук (демо/диагностика) */
 window.TAIMEN = { cam, orbs, S, spawnOrb, toggleEntity, setStatus, focusOrb,
