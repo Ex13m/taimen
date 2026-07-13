@@ -71,7 +71,7 @@ exports.handler = async (event) => {
   }
 
   const system = typeof body.system === 'string' ? body.system : undefined;
-  const model = MODELS[body.model] ? body.model : DEFAULT_MODEL;
+  const model = Object.prototype.hasOwnProperty.call(MODELS, body.model) ? body.model : DEFAULT_MODEL;
   const maxTokens = Math.min(
     Number.isInteger(body.max_tokens) && body.max_tokens > 0 ? body.max_tokens : MAX_TOKENS_CAP,
     MAX_TOKENS_CAP
@@ -85,7 +85,7 @@ exports.handler = async (event) => {
     return json(429, { error: 'Таймень ещё думает. Подожди пару секунд.' });
   }
   lastHit.set(ip, now);
-  if (lastHit.size > 500) lastHit.clear(); // не копим мусор
+  if (lastHit.size > 500) for (const [k, t] of lastHit) if (now - t > MIN_INTERVAL_MS) lastHit.delete(k); // не копим мусор
 
   const today = new Date().toISOString().slice(0, 10);
   if (daily.day !== today) daily = { day: today, count: 0 };

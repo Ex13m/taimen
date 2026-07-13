@@ -51,7 +51,8 @@ async function ensureBranch(token, repo, branch) {
     method: 'POST',
     body: JSON.stringify({ ref: `refs/heads/${branch}`, sha }),
   });
-  return created.ok;
+  // 422 «Reference already exists» — ветку успел создать конкурентный запрос
+  return created.ok || created.status === 422;
 }
 
 exports.handler = async (event) => {
@@ -98,7 +99,7 @@ exports.handler = async (event) => {
     return json(429, { error: 'Память пишется не чаще раза в 5 секунд.' });
   }
   lastWrite.set(ip, now);
-  if (lastWrite.size > 500) lastWrite.clear();
+  if (lastWrite.size > 500) for (const [k, t] of lastWrite) if (now - t > MIN_WRITE_INTERVAL_MS) lastWrite.delete(k);
 
   try {
     if (!(await ensureBranch(token, repo, branch))) {

@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#060318">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -38,7 +38,7 @@
   }
 
   /* HUD */
-  #hud{ position: fixed; top: 14px; left: 14px; padding: 12px 16px; z-index: 5; min-width: 180px; }
+  #hud{ position: fixed; top: 14px; left: 14px; top: calc(14px + env(safe-area-inset-top)); left: calc(14px + env(safe-area-inset-left)); padding: 12px 16px; z-index: 5; min-width: 180px; }
   #hud h1{ font-size: 17px; letter-spacing: .35em; font-weight: 600; color: #e6efff; text-shadow: 0 0 18px rgba(110,168,255,.8); }
   #hud .sub{ font-size: 12px; color: var(--dim); margin-top: 4px; display: flex; gap: 8px; align-items: center; }
   #status-dot{ width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); transition: background .4s, box-shadow .4s; }
@@ -47,6 +47,7 @@
 
   #memchip{
     position: fixed; top: 14px; right: 14px; z-index: 5;
+    top: calc(14px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right));
     padding: 8px 14px; font-size: 12px; color: var(--dim); cursor: pointer;
   }
   #memchip b{ color: var(--text); font-weight: 500; }
@@ -65,7 +66,7 @@
   /* Чат */
   #chat{
     position: fixed; left: 50%; transform: translateX(-50%);
-    bottom: 16px; width: min(680px, calc(100% - 24px));
+    bottom: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: min(680px, calc(100% - 24px));
     z-index: 6; padding: 10px 12px 12px;
     display: flex; flex-direction: column; gap: 8px;
   }
@@ -97,9 +98,9 @@
   @keyframes recpulse{ 50%{ box-shadow: 0 0 26px rgba(255,110,100,.8); } }
 
   /* Знания и память */
-  #knowbtn{ position: fixed; left: 14px; bottom: 16px; z-index: 7; }
+  #knowbtn{ position: fixed; left: 14px; bottom: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 7; }
   #know{
-    position: fixed; left: 14px; bottom: 68px; z-index: 7;
+    position: fixed; left: 14px; bottom: 68px; bottom: calc(68px + env(safe-area-inset-bottom)); z-index: 7;
     width: min(340px, calc(100% - 28px)); max-height: 62vh; overflow-y: auto;
     padding: 14px; display: none; flex-direction: column; gap: 10px;
   }
@@ -111,7 +112,8 @@
   }
   .kitem{ font-size: 12px; display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
     border-bottom: 1px dashed rgba(120,160,255,.12); padding-bottom: 5px; }
-  .kitem .kx{ cursor: pointer; color: var(--dim); } .kitem .kx:hover{ color: var(--warn); }
+  .kitem .kx{ cursor: pointer; color: var(--dim); padding: 12px 14px; margin: -12px -14px; /* визуально без изменений, тап-зона >=40px */ } .kitem .kx:hover{ color: var(--warn); }
+  .btn, .entlabel, #memchip, .kx, #inp{ touch-action: manipulation; }
   .note{ font-size: 12px; color: var(--dim); }
 
   /* Запуск */
@@ -157,6 +159,9 @@
     .btn{ padding: 12px 15px; font-size: 17px; }
     #inp{ padding: 12px 13px; font-size: 16px; } /* 16px — чтобы iOS не зумил */
     #hearing{ font-size: 18px; bottom: 26vh; }
+    /* на телефоне кнопка «знания» уходит из зоны чата под HUD */
+    #knowbtn{ bottom: auto; top: calc(112px + env(safe-area-inset-top)); }
+    #know{ bottom: auto; top: calc(164px + env(safe-area-inset-top)); max-height: 50vh; }
   }
 </style>
 </head>
@@ -220,7 +225,11 @@ const MAXO = 9;
 /* ---------- Шейдеры ---------- */
 const VERT = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
 const FRAG = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
+#else
+precision mediump float;
+#endif
 uniform vec2 u_res; uniform float u_time;
 uniform vec3 u_camPos, u_camFwd, u_camRight, u_camUp;
 uniform int u_count;
@@ -293,7 +302,7 @@ int nearest(vec3 p){
 
 vec3 bgSky(vec3 rd){
   float up = rd.y*0.5 + 0.5;
-  vec3 bg = mix(vec3(0.010, 0.006, 0.040), vec3(0.055, 0.035, 0.16), pow(up, 1.6));
+  vec3 bg = mix(vec3(0.010, 0.006, 0.040), vec3(0.055, 0.035, 0.16), pow(clamp(up, 0.0, 1.0), 1.6));
   bg += vec3(0.05, 0.02, 0.10) * fbm2(rd.xz*2.0 + rd.y) * 0.35;
   /* звёзды */
   vec3 a = abs(rd);
@@ -360,7 +369,7 @@ void main(){
 
     vec3 L1 = normalize(vec3(0.55, 0.8, 0.5));
     float diff = max(dot(n, L1), 0.0);
-    float fres = pow(1.0 - max(dot(n, -rd), 0.0), 2.6);
+    float fres = pow(clamp(1.0 - dot(n, -rd), 0.0, 1.0), 2.6);
     float spec = pow(max(dot(reflect(rd, n), L1), 0.0), 30.0);
 
     float bright = 0.30 + st.w*0.65;
@@ -374,7 +383,7 @@ void main(){
       float tile = ms.z;
       vec2 tuv = (vec2(mod(tile, 3.0), floor(tile/3.0)) + su) / 3.0;
       float sig = texture2D(u_tex, tuv).a;
-      float edge = smoothstep(0.0, 0.15, su.x)*smoothstep(1.0, 0.85, su.x)*smoothstep(0.0, 0.15, su.y)*smoothstep(1.0, 0.85, su.y);
+      float edge = smoothstep(0.0, 0.15, su.x)*(1.0 - smoothstep(0.85, 1.0, su.x))*smoothstep(0.0, 0.15, su.y)*(1.0 - smoothstep(0.85, 1.0, su.y));
       float front = smoothstep(0.05, 0.5, dot(dir, -rd));
       float flick = 0.55 + 0.45*fbm2(su*7.0 + t*0.9);
       c += col * sig * edge * front * flick * ms.w * 1.6;
@@ -566,6 +575,7 @@ orbs.push({ entId: null, level: 0, slot: -1, birthT: -10, pos: [0,0,0], rad: 1.0
 
 function spawnOrb(entId, parentIdx, level){
   if (orbs.length >= MAXO) return null;
+  if ((level || 1) === 1 && orbs.some(o => o.entId === entId && o.level === 1)) return null;
   const e = ENTITIES[entId];
   const slot = orbs.filter(o => o.level === 1).length;
   const o = {
@@ -637,6 +647,11 @@ canvas.addEventListener('pointermove', (e) => {
 function endPointer(e){
   pointers.delete(e.pointerId);
   if (pointers.size < 2) pinch0 = 0;
+  if (pointers.size === 1){
+    const rest = [...pointers.values()][0];
+    px = rest[0]; py = rest[1];
+    moved = 99; // отпускание после щипка — не тап
+  }
   if (pointers.size === 0){
     canvas.classList.remove('drag');
     if (dragging && moved < 7){
@@ -1071,7 +1086,9 @@ if (!SRec) { $('mic').style.display = 'none'; }
 async function micMeterOn(){
   try {
     if (!navigator.mediaDevices) return;
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (S.state !== 'listening'){ stream.getTracks().forEach(tr => tr.stop()); return; }
+    micStream = stream;
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') await audioCtx.resume();
     const src = audioCtx.createMediaStreamSource(micStream);
@@ -1139,7 +1156,7 @@ function pickVoice(){
 }
 if (window.speechSynthesis){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 function speak(text){
-  if (!S.voiceOut || !window.speechSynthesis || !text){ setStatus('idle'); return; }
+  if (!S.voiceOut || !window.speechSynthesis || !text){ if (S.state === 'thinking' || S.state === 'speaking') setStatus('idle'); return; }
   try {
     speechSynthesis.cancel();
     const clean = text.replace(/[*_#\`>\[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 800);
@@ -1148,8 +1165,8 @@ function speak(text){
     u.lang = 'ru-RU'; u.rate = 1.0; u.pitch = 0.8;
     u.onstart = () => { setStatus('speaking'); speechEnv = 0.5; };
     u.onboundary = () => { speechEnv = 0.45 + Math.random() * 0.35; };
-    u.onend = () => { speechEnv = 0; setStatus('idle'); };
-    u.onerror = () => { speechEnv = 0; setStatus('idle'); };
+    u.onend = () => { speechEnv = 0; if (S.state === 'speaking') setStatus('idle'); };
+    u.onerror = () => { speechEnv = 0; if (S.state === 'speaking') setStatus('idle'); };
     speechSynthesis.speak(u);
   } catch { setStatus('idle'); }
 }
@@ -1161,10 +1178,18 @@ $('spk').onclick = () => {
 };
 
 /* ---------- Ввод ---------- */
-$('send').onclick = () => { sendMessage($('inp').value); $('inp').value = ''; };
+$('send').onclick = () => { const v = $('inp').value.trim(); if (v && !busy){ sendMessage(v); $('inp').value = ''; } };
 $('inp').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter'){ sendMessage($('inp').value); $('inp').value = ''; }
+  if (e.key === 'Enter'){ const v = $('inp').value.trim(); if (v && !busy){ sendMessage(v); $('inp').value = ''; } }
 });
+
+/* экранная клавиатура: поднимаем строку ввода над ней (iOS/фолбэк) */
+if (window.visualViewport){
+  visualViewport.addEventListener('resize', () => {
+    const kb = Math.max(0, innerHeight - visualViewport.height - visualViewport.offsetTop);
+    $('chat').style.bottom = kb > 0 ? (16 + kb) + 'px' : '';
+  });
+}
 
 /* ---------- Запуск: помощники почкуются ---------- */
 $('start').onclick = () => {
