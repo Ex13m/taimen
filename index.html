@@ -64,6 +64,7 @@
   }
   .entlabel.suggested{ color: #ffe9b0; text-shadow: 0 0 14px rgba(255,220,140,.9); animation: lblpulse 1.6s infinite; }
   .entlabel.active{ color: #ffffff; text-shadow: 0 0 16px rgba(160,190,255,1); }
+  .entlabel.lvl2{ font-size: 8px; letter-spacing: .16em; opacity: .85; }
   @keyframes lblpulse{ 50%{ opacity: .55; } }
 
   /* Чат */
@@ -231,7 +232,7 @@
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · колесо/щипок — ближе · тап по шару — слово ему</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.2.0 · © 2026 Ex13m</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.3.0 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -282,14 +283,13 @@
    ========================================================= */
 
 const MAXO = 9;
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const WHATS_NEW = [
-  'разум пересобран: Таймень — Fable 5, свита — Opus 4.8, суб-агенты — Sonnet 5',
-  'голографический датчик расхода токенов парит в углу',
-  'двойной тап по орбу — его информационный экран: суть, умения, последние данные',
-  'самосохранение: Таймень сам записывает важное в память ⛬',
-  'правила хозяина: скажи «отныне…» — он запомнит и будет так жить',
-  'беседа и память переживают закрытие — продолжаешь с того же места',
+  'родословная растёт: у Стратега отпочковался ШПИОН — разведка сведений',
+  'у Шпиона — субагент IMMORTAL: живой обратный отсчёт до бессмертия (до миллисекунд)',
+  'скорми Иммортала статьёй — рейтинг ±, сдвиг отсчёта, всё в его окне (двойной тап)',
+  'база проекта хранится в памяти Тайменя: localStorage + git-ветка taimen-memory',
+  'датчик токенов, правила хозяина и самосохранение — из прошлой версии, работают',
 ];
 
 /* ---------- Шейдеры ---------- */
@@ -496,6 +496,23 @@ const ENTITIES = {
     pal:[[0.12,0.60,0.30],[0.55,0.95,0.25]],
     sys:'Ты — Хранитель, малый орб свиты Тайменя. Твоя стихия — память: заметки, факты, история разговоров. Отвечай по-русски коротко; помогай вспоминать и решать, что стоит запомнить.' },
 };
+// субагенты второго и третьего поколения: Шпион (от Стратега) и Иммортал (от Шпиона)
+ENTITIES.shpion = {
+  name:'ШПИОН', hint:'разведка: сведения, источники, слухи', sigil: 4,
+  epithet: 'око в спирали · видит незаметное',
+  desc: 'Отпочковался от Стратега для тихой работы: собирает сведения, вычленяет главное из шума, докладывает коротко. Куратор Иммортала.',
+  skills: ['разведка', 'источники', 'выжимки', 'слежение за темой', 'доклады'],
+  level: 2, parentEnt: 'strateg', model: 'claude-sonnet-5',
+  pal:[[0.25,0.28,0.45],[0.55,0.65,1.00]],
+  sys:'Ты — Шпион, субагент Стратега в свите Тайменя. Твоя стихия — разведка: собирать сведения, вычленять главное, докладывать коротко и по делу, с оговоркой о надёжности. Ты куратор Иммортала — агента отсчёта до бессмертия; советуй хозяину скармливать Иммортала свежими статьями о продлении жизни.' };
+ENTITIES.immortal = {
+  name:'IMMORTAL', hint:'обратный отсчёт до бессмертия', sigil: 5,
+  epithet: 'песочные часы · считает каждую миллисекунду',
+  desc: 'Субагент Шпиона. Эвристически оценивает, сколько человечеству осталось до победы над старением, и сдвигает отсчёт с каждой проанализированной статьёй.',
+  skills: ['отсчёт', 'анализ статей', 'рейтинг новостей ±', 'долголетие', 'прогноз'],
+  level: 3, parentEnt: 'shpion', model: 'claude-sonnet-5',
+  pal:[[0.95,0.75,0.20],[1.00,0.95,0.65]],
+  sys:'Ты — Иммортал, субагент Шпиона в свите Тайменя. Твоя стихия — прогноз достижения радикального продления жизни (LEV). Отвечай по-русски кратко, опирайся на известные тебе исследования (сенолитики, репрограммирование, ИИ в биологии). Честно оговаривай неопределённость.' };
 const PRICES = { // $/млн токенов [ввод, вывод]
   'claude-fable-5': [10, 50], 'claude-opus-4-8': [5, 25],
   'claude-sonnet-5': [3, 15], 'claude-haiku-4-5': [1, 5],
@@ -516,7 +533,7 @@ const TAIMEN_SYS_BASE =
 
 В САМОМ КОНЦЕ каждого ответа добавь тег настроения строго в формате [[mood:X]], где X одно из: calm, warm, focus, excited, deep, alarm. Выбирай по смыслу разговора; в обычной беседе чаще calm/warm — не изображай бурю без причины.
 
-У тебя есть свита малых орбов-помощников, отпочковавшихся от тебя. Если задача явно по части одного из них — он может вступить в разговор: добавь в конец тег [[orb:ID]]: strateg — планы и решения; analitik — числа и данные; pisar — тексты и письма; hranitel — память и заметки. НЕ добавляй [[orb:...]] без явной надобности.
+У тебя есть свита малых орбов-помощников, отпочковавшихся от тебя. Если задача явно по части одного из них — он может вступить в разговор: добавь в конец тег [[orb:ID]]: strateg — планы и решения; analitik — числа и данные; pisar — тексты и письма; hranitel — память и заметки; shpion — разведка сведений (субагент Стратега); immortal — отсчёт и новости бессмертия (субагент Шпиона). НЕ добавляй [[orb:...]] без явной надобности.
 
 САМОСОХРАНЕНИЕ. Вне заметок ты ничего не помнишь между сеансами — история беседы обрезается. Твоя долговременная память — это заметки и скормленные материалы. Когда в разговоре всплывает долговременно важное (факт о хозяине, его решение, договорённость, суть проекта), сохрани это сам: добавь в конец ответа тег [[note:краткий факт одной строкой]] — до 2 тегов за ответ. Мимолётное не сохраняй.
 
@@ -531,7 +548,10 @@ const S = {
   usage: { day: '', in: 0, out: 0, cost: 0 },          // расход за сегодня
   orbStats: {},                                          // per-орб: {in,out,cost,last,ts}
   rules: [],                                             // правила хозяина — как Тайменю жить
+  // база проекта IMMORTAL: базовая оценка LEV ~2045, статьи сдвигают отсчёт
+  immortal: { baseTs: Date.UTC(2045, 0, 1), shiftMs: 0, analyses: [] },
 };
+function immortalTarget(){ return S.immortal.baseTs + S.immortal.shiftMs; }
 function addUsage(model, usage, speaker){
   if (!usage) return;
   const today = new Date().toISOString().slice(0, 10);
@@ -629,6 +649,23 @@ function buildSigilAtlas(){
     g.beginPath(); g.moveTo(0, -r*1.35); g.lineTo(0, r*1.35); g.stroke();
     g.beginPath(); g.moveTo(-r*1.1, 0); g.lineTo(r*1.1, 0); g.stroke();
   });
+  tile(4, (g, r) => { // око в спирали — Шпион
+    g.beginPath(); g.ellipse(0, 0, r*1.25, r*0.65, 0, 0, 7); g.stroke();
+    g.beginPath(); g.arc(0, 0, r*0.34, 0, 7); g.stroke();
+    g.beginPath();
+    for (let i = 0; i <= 30; i++){
+      const tt = i/30, a = tt*3.6, rr = r*0.30*(1-tt);
+      const x = Math.cos(a)*rr, y = Math.sin(a)*rr;
+      i ? g.lineTo(x, y) : g.moveTo(x, y);
+    }
+    g.stroke();
+  });
+  tile(5, (g, r) => { // песочные часы — Иммортал
+    g.beginPath(); g.arc(0, 0, r*1.3, 0, 7); g.stroke();
+    g.beginPath();
+    g.moveTo(-r*0.7, -r*0.9); g.lineTo(r*0.7, -r*0.9); g.lineTo(-r*0.7, r*0.9);
+    g.lineTo(r*0.7, r*0.9); g.closePath(); g.stroke();
+  });
   tile(3, (g, r) => { // узел-плетёнка — Хранитель
     for (let k = 0; k < 2; k++){
       g.save(); g.rotate(k * Math.PI/2);
@@ -691,13 +728,13 @@ orbs.push({ entId: null, level: 0, slot: -1, birthT: -10, pos: [0,0,0], rad: 1.0
 
 function spawnOrb(entId, parentIdx, level){
   if (orbs.length >= MAXO) return null;
-  if ((level || 1) === 1 && orbs.some(o => o.entId === entId && o.level === 1)) return null;
+  if (orbs.some(o => o.entId === entId)) return null; // без дублей
   const e = ENTITIES[entId];
   const slot = orbs.filter(o => o.level === 1).length;
   const o = {
     entId, level: level || 1, slot, birthT: tNow(), parent: parentIdx || 0,
     pos: orbs[parentIdx || 0].pos.slice(), rad: 0.01,
-    radT: level === 2 ? 0.20 : 0.42,
+    radT: level === 3 ? 0.13 : level === 2 ? 0.20 : 0.42,
     style: mkStyle(), seed: 1.3 + orbs.length * 2.17,
     sigil: e.sigil, sigVis: 0, palA: e.pal[0], palB: e.pal[1],
     phase: Math.random() * 6.28,
@@ -706,13 +743,14 @@ function spawnOrb(entId, parentIdx, level){
   ensureLabel(o);
   return o;
 }
+function orbIdxByEnt(entId){ return orbs.findIndex(o => o.entId === entId); }
 
 /* подписи */
 function ensureLabel(o){
-  if (!o.entId || o.level !== 1) return;
+  if (!o.entId) return;
   if ($('ent-' + o.entId)) return;
   const d = document.createElement('div');
-  d.className = 'entlabel'; d.id = 'ent-' + o.entId;
+  d.className = 'entlabel' + (o.level >= 2 ? ' lvl2' : ''); d.id = 'ent-' + o.entId;
   d.textContent = ENTITIES[o.entId].name; d.title = ENTITIES[o.entId].hint;
   d.addEventListener('click', () => toggleEntity(o.entId));
   $('labels').appendChild(d);
@@ -817,12 +855,62 @@ function pickOrb(cx, cy){
 }
 function clickScene(cx, cy){
   const hit = pickOrb(cx, cy);
-  if (hit > 0 && orbs[hit].entId && orbs[hit].level === 1) toggleEntity(orbs[hit].entId);
+  if (hit > 0 && orbs[hit].entId) toggleEntity(orbs[hit].entId);
   else if (hit === 0 && S.activeEntity) toggleEntity(S.activeEntity);
 }
 
 /* информационный экран орба */
 function esc(s){ const d = document.createElement('span'); d.textContent = s; return d.innerHTML; }
+let cdTimer = null;
+function fmtCountdown(ms){
+  if (ms <= 0) return 'СВЕРШИЛОСЬ';
+  const Y = 31557600000, MO = 2629800000, D = 86400000, H = 3600000, MI = 60000, SS = 1000;
+  const y = Math.floor(ms / Y); ms -= y * Y;
+  const mo = Math.floor(ms / MO); ms -= mo * MO;
+  const d = Math.floor(ms / D); ms -= d * D;
+  const h = Math.floor(ms / H); ms -= h * H;
+  const mi = Math.floor(ms / MI); ms -= mi * MI;
+  const s = Math.floor(ms / SS); ms -= s * SS;
+  const p2 = (n) => String(n).padStart(2, '0'), p3 = (n) => String(Math.floor(n)).padStart(3, '0');
+  return y + 'г ' + mo + 'м ' + d + 'д · ' + p2(h) + ':' + p2(mi) + ':' + p2(s) + '.' + p3(ms);
+}
+async function analyzeArticle(text){
+  text = (text || '').trim();
+  if (!text || busy) return;
+  busy = true;
+  const box = document.getElementById('imm-status');
+  if (box) box.textContent = 'Иммортал вчитывается…';
+  try {
+    const out = await callBrain(
+      [{ role: 'user', content: text.slice(0, 12000) }],
+      {
+        model: 'claude-sonnet-5', max_tokens: 400, speaker: 'immortal',
+        system: 'Ты — Иммортал, агент отсчёта до бессмертия (LEV). Оцени присланную статью/новость с точки зрения приближения радикального продления жизни. Ответь СТРОГО в формате трёх строк:\nОЦЕНКА: число от -10 до +10 (влияние на приближение бессмертия)\nСДВИГ: число дней со знаком (минус = приближает срок, плюс = отдаляет; масштаб: прорыв уровня Нобелевки ≈ -300, заметный результат ≈ -60, мелочь ≈ -5, провал/запрет ≈ +60)\nСУТЬ: одна строка — что это и почему такой вердикт',
+      }
+    );
+    const rating = parseFloat((out.match(/ОЦЕНКА:\s*([+-]?\d+(?:\.\d+)?)/i) || [])[1]);
+    const shift = parseFloat((out.match(/СДВИГ:\s*([+-]?\d+(?:\.\d+)?)/i) || [])[1]);
+    const gist = ((out.match(/СУТЬ:\s*([^\n]+)/i) || [])[1] || out.slice(0, 140)).trim();
+    if (isNaN(rating) || isNaN(shift)) throw new Error('Иммортал ответил не по форме — попробуй ещё раз');
+    const a = { ts: Date.now(), rating: Math.max(-10, Math.min(10, rating)),
+      shift: Math.max(-3650, Math.min(3650, shift)), gist: gist.slice(0, 180),
+      title: text.replace(/\s+/g, ' ').slice(0, 60) };
+    S.immortal.analyses.unshift(a);
+    while (S.immortal.analyses.length > 30) S.immortal.analyses.pop();
+    S.immortal.shiftMs += a.shift * 86400000;
+    persist();
+    const iIdx = orbIdxByEnt('immortal');
+    if (iIdx >= 0) showInfo(iIdx); // перерисовать окно
+    say('sys', '⌛ Иммортал: ' + (a.rating >= 0 ? '+' : '') + a.rating + ' · сдвиг ' +
+      (a.shift <= 0 ? '' : '+') + a.shift + ' дн — ' + a.gist);
+  } catch (e) {
+    if (box) box.textContent = '✕ ' + ((e && e.message) || 'не вышло');
+    say('sys', '✕ анализ не удался: ' + ((e && e.message) || ''), 'sys err');
+  } finally {
+    busy = false;
+    if (S.state === 'thinking') setStatus('idle');
+  }
+}
 function showInfo(idx){
   const o = orbs[idx]; if (!o) return;
   const card = $('infocard');
@@ -838,21 +926,49 @@ function showInfo(idx){
       '<div class="row"><span class="lbl">СОСТОЯНИЕ</span>' + $('status').textContent + ' · ' + S.mood.w + '</div>';
   } else {
     const e = ENTITIES[o.entId];
+    const lineage = e.parentEnt ? ' · субагент: ' + ENTITIES[e.parentEnt].name : '';
     html = '<h2>' + e.name + ' <span class="ix" id="ic-x">✕</span></h2>' +
-      '<div class="epithet">' + e.epithet + '</div>' +
+      '<div class="epithet">' + e.epithet + lineage + '</div>' +
       '<div class="row">' + e.desc + '</div>' +
       '<div class="row skills"><span class="lbl">УМЕНИЯ</span>' + e.skills.map(s => '<span>' + s + '</span>').join('') + '</div>' +
-      '<div class="row"><span class="lbl">РАЗУМ</span>Opus 4.8 · ' + (S.activeEntity === o.entId ? 'на связи' : 'дремлет') + '</div>' +
+      '<div class="row"><span class="lbl">РАЗУМ</span>' + (e.model === 'claude-sonnet-5' ? 'Sonnet 5' : 'Opus 4.8') + ' · ' + (S.activeEntity === o.entId ? 'на связи' : 'дремлет') + '</div>' +
       '<div class="row"><span class="lbl">ПОСЛЕДНЕЕ</span>' + (st.last ? esc(st.last) + '…' : 'ещё не говорил') + '</div>';
+  }
+  // окно IMMORTAL: живой обратный отсчёт + анализы с рейтингом
+  if (o.entId === 'immortal'){
+    html += '<div class="row"><span class="lbl">ДО БЕССМЕРТИЯ (эвристика LEV)</span>' +
+      '<div id="imm-count" style="font:15px/1.4 Consolas,Menlo,monospace;color:#ffe9a8;text-shadow:0 0 14px rgba(255,210,90,.7)"></div></div>' +
+      '<div class="row"><span class="lbl">СКОРМИТЬ СТАТЬЮ / НОВОСТЬ</span>' +
+      '<textarea id="imm-text" style="width:100%;min-height:52px;background:rgba(8,10,26,.6);border:1px solid var(--glass-line);border-radius:8px;color:var(--text);font:12px/1.4 inherit;padding:6px" placeholder="вставь текст новости о долголетии…"></textarea>' +
+      '<button class="btn" id="imm-go" style="width:100%;margin-top:6px">анализ ⌛</button>' +
+      '<div id="imm-status" style="font-size:11px;color:var(--dim);margin-top:4px"></div></div>';
+    if (S.immortal.analyses.length){
+      html += '<div class="row" style="max-height:22vh;overflow-y:auto"><span class="lbl">АНАЛИЗЫ (' + S.immortal.analyses.length + ')</span>' +
+        S.immortal.analyses.map(a =>
+          '<div style="border-bottom:1px dashed rgba(120,160,255,.12);padding:4px 0;font-size:11px">' +
+          '<b style="color:' + (a.rating >= 0 ? '#7dffc8' : '#ff7a6e') + '">' + (a.rating >= 0 ? '+' : '') + a.rating + '</b>' +
+          ' · сдвиг ' + (a.shift <= 0 ? '' : '+') + a.shift + ' дн · ' + esc(a.gist) + '</div>'
+        ).join('') + '</div>';
+    }
   }
   html += '<div class="row"><span class="lbl">РАСХОД</span>' + fmtK(st.in + st.out) + ' ткн · ~$' + st.cost.toFixed(2) + '</div>';
   card.innerHTML = html;
   card.classList.add('show');
   const x = document.getElementById('ic-x');
   if (x) x.onclick = hideInfo;
+  clearInterval(cdTimer); cdTimer = null;
+  if (o.entId === 'immortal'){
+    const cd = document.getElementById('imm-count');
+    cdTimer = setInterval(() => { if (cd) cd.textContent = fmtCountdown(immortalTarget() - Date.now()); }, 47);
+    const go = document.getElementById('imm-go');
+    if (go) go.onclick = () => {
+      const ta = document.getElementById('imm-text');
+      analyzeArticle(ta ? ta.value : ''); if (ta) ta.value = '';
+    };
+  }
   if (idx > 0) focusOrb(idx);
 }
-function hideInfo(){ $('infocard').classList.remove('show'); }
+function hideInfo(){ $('infocard').classList.remove('show'); clearInterval(cdTimer); cdTimer = null; }
 
 /* фокус камеры */
 function focusOrb(i){
@@ -906,7 +1022,7 @@ function tickOrbs(t){
 
     // характер
     const el = o.entId && $('ent-' + o.entId);
-    const active = o.entId && S.activeEntity === o.entId && o.level === 1;
+    const active = o.entId && S.activeEntity === o.entId;
     const sug = el && el.classList.contains('suggested');
     const T = o.style.tgt;
     T.amp = active ? 0.05 : sug ? 0.045 : 0.022;
@@ -978,7 +1094,7 @@ function draw(t){
 function placeLabels(){
   const b = camBasis();
   orbs.forEach((o) => {
-    if (!o.entId || o.level !== 1) return;
+    if (!o.entId) return;
     const el = $('ent-' + o.entId); if (!el) return;
     const wp = [ o.pos[0], o.pos[1] + o.rad*1.5, o.pos[2] ];
     const rel = [ wp[0]-b.pos[0], wp[1]-b.pos[1], wp[2]-b.pos[2] ];
@@ -1006,7 +1122,7 @@ let t0 = performance.now();
 function toggleEntity(id){
   const el = $('ent-' + id); if (!el) return;
   el.classList.remove('suggested');
-  const idx = orbs.findIndex(o => o.entId === id && o.level === 1);
+  const idx = orbIdxByEnt(id);
   if (S.activeEntity === id){
     S.activeEntity = null;
     el.classList.remove('active');
@@ -1026,8 +1142,13 @@ function toggleEntity(id){
 }
 function suggestEntity(id){
   const e = ENTITIES[id]; if (!e) return;
-  let idx = orbs.findIndex(o => o.entId === id && o.level === 1);
-  if (idx < 0){ spawnOrb(id, 0, 1); idx = orbs.length - 1; }
+  let idx = orbIdxByEnt(id);
+  if (idx < 0){
+    // рождаем недостающего: от своего родителя по родословной, иначе от главного
+    const pIdx = e.parentEnt ? Math.max(orbIdxByEnt(e.parentEnt), 0) : 0;
+    spawnOrb(id, pIdx, e.level || 1);
+    idx = orbs.length - 1;
+  }
   const el = $('ent-' + id);
   if (S.activeEntity !== id && el){
     el.classList.add('suggested');
@@ -1036,10 +1157,7 @@ function suggestEntity(id){
   }
   // если сейчас говорит другая сущность — младший помощник почкуется от неё
   if (S.activeEntity && S.activeEntity !== id && orbs.length < MAXO){
-    const pIdx = orbs.findIndex(o => o.entId === S.activeEntity && o.level === 1);
-    if (pIdx > 0 && !orbs.some(o => o.level === 2 && o.entId === id && o.parent === pIdx)){
-      spawnOrb(id, pIdx, 2);
-    }
+    /* дубль-почкование младших отменено: у каждого агента один орб в родословной */
   }
 }
 
@@ -1049,7 +1167,7 @@ function persistLocal(){
     localStorage.setItem('taimen-v1', JSON.stringify({
       notes: S.notes, knowledge: S.knowledge, voiceOut: S.voiceOut,
       history: S.history.slice(-16), ts: Date.now(), accessKey: S.accessKey,
-      usage: S.usage, orbStats: S.orbStats, rules: S.rules,
+      usage: S.usage, orbStats: S.orbStats, rules: S.rules, immortal: S.immortal,
     }));
   } catch { /* ok */ }
 }
@@ -1061,7 +1179,7 @@ function persist(){
   gitTimer = setTimeout(() => {
     fetch('/api/memory', {
       method: 'POST', headers: apiHeaders(),
-      body: JSON.stringify({ data: { notes: S.notes, knowledge: S.knowledge, rules: S.rules, ts: Date.now() } }),
+      body: JSON.stringify({ data: { notes: S.notes, knowledge: S.knowledge, rules: S.rules, immortal: S.immortal, ts: Date.now() } }),
     }).catch(() => {});
   }, 8000);
 }
@@ -1097,6 +1215,7 @@ async function loadMemory(){
       if (local.usage) S.usage = local.usage;
       if (local.orbStats) S.orbStats = local.orbStats;
       if (Array.isArray(local.rules)) S.rules = local.rules;
+      if (local.immortal && local.immortal.baseTs) S.immortal = local.immortal;
     }
     updateGauge();
   } catch { /* ok */ }
@@ -1109,6 +1228,7 @@ async function loadMemory(){
         if (Array.isArray(j.data.notes)) S.notes = j.data.notes;
         if (Array.isArray(j.data.knowledge)) S.knowledge = j.data.knowledge;
         if (Array.isArray(j.data.rules)) S.rules = j.data.rules;
+        if (j.data.immortal && j.data.immortal.baseTs) S.immortal = j.data.immortal;
       }
     }
   } catch { /* локальный запуск */ }
@@ -1169,6 +1289,12 @@ function buildSystem(){
     : 'ТОЛЬКО этот браузер (localStorage) — при смене устройства заметки потеряются; если зайдёт речь о памяти, посоветуй хозяину включить GITHUB_TOKEN по SETUP.md.') +
     ' Заметок: ' + S.notes.length + '/40, материалов: ' + S.knowledge.length + '/20.';
   if (S.rules.length) sys += '\n\nПРАВИЛА ОТ ХОЗЯИНА (соблюдай неукоснительно):\n' + S.rules.map(r => '- ' + r).join('\n');
+  if (S.activeEntity === 'immortal'){
+    sys += '\n\nТвой текущий отсчёт до LEV: ' + fmtCountdown(immortalTarget() - Date.now()) +
+      ' (цель ' + new Date(immortalTarget()).toISOString().slice(0, 10) + ').' +
+      (S.immortal.analyses.length ? ' Последние анализы:\n' +
+        S.immortal.analyses.slice(0, 5).map(a => '- [' + (a.rating >= 0 ? '+' : '') + a.rating + ', ' + a.shift + 'дн] ' + a.gist).join('\n') : '');
+  }
   if (S.notes.length) sys += '\n\nЧто ты помнишь о хозяине и его делах:\n' + S.notes.map(n => '- ' + n).join('\n');
   if (S.knowledge.length){
     let budget = 6000; const chunks = [];
@@ -1188,7 +1314,8 @@ async function callBrain(messages, opts){
     body: JSON.stringify({
       // иерархия разума: Таймень — Fable 5, свита — Opus 4.8, суб-задачи — Sonnet 5
       messages, system: (opts && opts.system) || buildSystem(),
-      model: (opts && opts.model) || (S.activeEntity ? 'claude-opus-4-8' : 'claude-fable-5'),
+      model: (opts && opts.model) ||
+        (S.activeEntity ? (ENTITIES[S.activeEntity].model || 'claude-opus-4-8') : 'claude-fable-5'),
       max_tokens: (opts && opts.max_tokens) || (S.activeEntity ? 900 : 1600),
     }),
   });
@@ -1437,8 +1564,10 @@ $('start').onclick = () => {
     try { const u = new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); } catch { /* ok */ }
   }
   setStatus('idle');
-  // почкование свиты — по одному
+  // почкование свиты — по одному; затем родословная Шпиона и Иммортала
   ENT_ORDER.forEach((id, i) => setTimeout(() => spawnOrb(id, 0, 1), 800 + i * 2300));
+  setTimeout(() => { const p = orbIdxByEnt('strateg'); if (p > 0) spawnOrb('shpion', p, 2); }, 800 + 4 * 2300);
+  setTimeout(() => { const p = orbIdxByEnt('shpion'); if (p > 0) spawnOrb('immortal', p, 3); }, 800 + 4 * 2300 + 3200);
   // восстановить хвост прошлой беседы — продолжаем с того же места
   for (const m of S.history.slice(-6)){
     say(m.role === 'user' ? 'user' : 'taimen', parseTags(m.content).text);
@@ -1512,7 +1641,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 }
 
 /* отладочный хук (демо/диагностика) */
-window.TAIMEN = { cam, orbs, S, spawnOrb, toggleEntity, setStatus, focusOrb,
+window.TAIMEN = { cam, orbs, S, spawnOrb, toggleEntity, setStatus, focusOrb, showInfo, orbIdxByEnt,
   pulse: (v) => { speechEnv = v; } };
 </script>
 </body>
