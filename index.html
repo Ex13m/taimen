@@ -727,7 +727,7 @@ function tickOrbs(t){
   // главный
   const T0 = orbs[0].style.tgt;
   if (S.state === 'idle'){ T0.amp = 0.020 + m.a*0.02; T0.flow = 0.5 + m.a*0.5; T0.inner = 0.24 + m.a*0.12; T0.pulse = breath; }
-  else if (S.state === 'listening'){ const lvl = micLevel > 0.05 ? micLevel : 0; T0.amp = 0.032 + m.a*0.02; T0.flow = 0.9; T0.inner = 0.34; T0.pulse = breath + lvl*1.2; }
+  else if (S.state === 'listening'){ const lvl = micLevel > 0.05 ? micLevel : 0; T0.amp = 0.032 + m.a*0.02; T0.flow = 0.9; T0.inner = 0.34; T0.pulse = breath + lvl*1.2; micLevel *= 0.94; }
   else if (S.state === 'thinking'){ T0.amp = 0.05; T0.flow = 2.4; T0.inner = 0.48; T0.pulse = 0.16 + 0.09*Math.sin(t*4.2); }
   else if (S.state === 'speaking'){ T0.amp = 0.04 + m.a*0.02; T0.flow = 1.2; T0.inner = 0.52; T0.pulse = breath + speechEnv; speechEnv *= 0.88; }
   const mix = 0.5 + m.v * 0.42;
@@ -1145,7 +1145,11 @@ function startListening(){
   recog = new SRec();
   recog.lang = 'ru-RU'; recog.interimResults = true; recog.continuous = false;
   let finalText = '';
+  // ВАЖНО: во время распознавания НЕ трогаем getUserMedia — на Android Chrome
+  // второй захват микрофона убивает SpeechRecognition. Пульс орба — из событий.
+  recog.onsoundstart = () => { micLevel = 0.5; };
   recog.onresult = (e) => {
+    micLevel = 0.55 + Math.random() * 0.35; // орб дышит в такт услышанному
     let interim = '';
     for (let i = e.resultIndex; i < e.results.length; i++){
       if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
@@ -1156,14 +1160,25 @@ function startListening(){
     h.textContent = (finalText + ' ' + interim).trim();
     h.classList.toggle('show', !!h.textContent);
   };
-  recog.onerror = () => stopListening();
+  recog.onerror = (e) => {
+    const code = e && e.error;
+    const why =
+      code === 'not-allowed' || code === 'service-not-allowed'
+        ? '🎙 нет доступа к микрофону — разреши его для этого сайта (замочек в адресной строке)'
+      : code === 'no-speech' ? '🎙 не расслышал — нажми и говори сразу'
+      : code === 'audio-capture' ? '🎙 микрофон занят другим приложением или не найден'
+      : code === 'network' ? '🎙 распознавание недоступно: нужен интернет'
+      : code === 'aborted' ? ''
+      : '🎙 распознавание не сработало (' + (code || '?') + ')';
+    if (why) say('sys', why);
+    stopListening();
+  };
   recog.onend = () => {
     stopListening();
     if (finalText.trim()) sendMessage(finalText);
   };
   setStatus('listening');
   $('mic').classList.add('rec');
-  micMeterOn();
   try { recog.start(); } catch { stopListening(); }
 }
 function stopListening(){
