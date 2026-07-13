@@ -43,7 +43,9 @@ netlify.toml             /api/* -> functions
 ```
 
 Контракт мозга: `POST /api/chat {messages, system, model?, max_tokens?} → {text}`.
-Модели: `claude-sonnet-4-6` (Таймень) и `claude-haiku-4-5` (свита и дистилляция памяти).
+Иерархия разума: `claude-fable-5` (Таймень, с фолбэком на Opus 4.8 при отказе),
+`claude-opus-4-8` (свита), `claude-sonnet-5` (суб-агенты: дистилляция памяти).
+⚠️ Fable — $10/$50 за млн токенов: следи за spend-cap.
 
 ## Как жить с Тайменем
 

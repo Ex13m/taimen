@@ -1022,9 +1022,10 @@ async function callBrain(messages, opts){
   const res = await fetch('/api/chat', {
     method: 'POST', headers: apiHeaders(),
     body: JSON.stringify({
+      // иерархия разума: Таймень — Fable 5, свита — Opus 4.8, суб-задачи — Sonnet 5
       messages, system: (opts && opts.system) || buildSystem(),
-      model: (opts && opts.model) || (S.activeEntity ? 'claude-haiku-4-5' : 'claude-sonnet-4-6'),
-      max_tokens: (opts && opts.max_tokens) || 700,
+      model: (opts && opts.model) || (S.activeEntity ? 'claude-opus-4-8' : 'claude-fable-5'),
+      max_tokens: (opts && opts.max_tokens) || (S.activeEntity ? 900 : 1600),
     }),
   });
   const j = await res.json().catch(() => ({}));
@@ -1092,7 +1093,7 @@ async function distill(){
     const out = await callBrain(
       [{ role: 'user', content: transcript }],
       {
-        model: 'claude-haiku-4-5', max_tokens: 300,
+        model: 'claude-sonnet-5', max_tokens: 300,
         system: 'Из диалога выдели до 4 коротких долговременных фактов о пользователе, его делах и предпочтениях — по одному в строке, без нумерации и пояснений. Уже известное не повторяй. Известно:\n' +
           S.notes.map(n => '- ' + n).join('\n') + '\nЕсли нового нет — ответь одним словом: ПУСТО.',
       }

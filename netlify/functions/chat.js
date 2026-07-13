@@ -5,16 +5,20 @@
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
 
-// Разрешённые модели: мозг (sonnet) и дешёвые суб-вызовы (haiku).
+// Иерархия разума: значение — потолок max_tokens для модели.
+// Таймень — Fable 5 (мышление всегда включено и ест бюджет ответа — потолок выше),
+// свита — Opus 4.8, суб-агенты-исполнители — Sonnet 5, haiku — резерв.
 const MODELS = {
-  'claude-sonnet-4-6': true,
-  'claude-haiku-4-5': true,
+  'claude-fable-5': 2000,
+  'claude-opus-4-8': 1200,
+  'claude-sonnet-5': 1000,
+  'claude-haiku-4-5': 800,
 };
-const DEFAULT_MODEL = 'claude-sonnet-4-6';
+const DEFAULT_MODEL = 'claude-fable-5';
+const FABLE_FALLBACK = 'claude-opus-4-8'; // при отказе классификаторов Fable
 
 const MAX_BODY_BYTES = 32 * 1024; // 32KB
 const MAX_MESSAGES = 16;
-const MAX_TOKENS_CAP = 1000;
 const MIN_INTERVAL_MS = 2000; // >=2с между запросами с одного IP
 
 // Ограничитель в памяти инстанса функции. Не переживает холодный старт —
@@ -78,9 +82,10 @@ exports.handler = async (event) => {
 
   const system = typeof body.system === 'string' ? body.system : undefined;
   const model = Object.prototype.hasOwnProperty.call(MODELS, body.model) ? body.model : DEFAULT_MODEL;
+  const cap = MODELS[model];
   const maxTokens = Math.min(
-    Number.isInteger(body.max_tokens) && body.max_tokens > 0 ? body.max_tokens : MAX_TOKENS_CAP,
-    MAX_TOKENS_CAP
+    Number.isInteger(body.max_tokens) && body.max_tokens > 0 ? body.max_tokens : cap,
+    cap
   );
 
   // --- Ограничитель трат ---
@@ -107,14 +112,21 @@ exports.handler = async (event) => {
   }
 
   try {
+    const isFable = model === 'claude-fable-5';
     const res = await fetch(ANTHROPIC_URL, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': API_VERSION,
+        // серверный фолбэк: если классификаторы Fable отказали — тот же запрос
+        // дослуживает Opus 4.8 внутри того же вызова
+        ...(isFable ? { 'anthropic-beta': 'server-side-fallback-2026-06-01' } : {}),
       },
-      body: JSON.stringify({ model, max_tokens: maxTokens, system, messages }),
+      body: JSON.stringify({
+        model, max_tokens: maxTokens, system, messages,
+        ...(isFable ? { fallbacks: [{ model: FABLE_FALLBACK }] } : {}),
+      }),
     });
 
     if (!res.ok) {
@@ -132,6 +144,9 @@ exports.handler = async (event) => {
     }
 
     const data = await res.json();
+    if (data.stop_reason === 'refusal') {
+      return json(200, { text: 'Об этом я говорить не стану — спроси иначе.' });
+    }
     const text = (data.content || [])
       .filter((b) => b.type === 'text')
       .map((b) => b.text)
