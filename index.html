@@ -171,6 +171,54 @@
     #hud h1{ font-size: 15px; letter-spacing: .25em; }
     #memchip{ max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   }
+
+  /* голографический датчик расхода токенов — парит в углу */
+  #gauge{
+    position: fixed; right: calc(18px + env(safe-area-inset-right)); bottom: 34vh;
+    z-index: 4; pointer-events: none; text-align: right;
+    font: 11px/1.5 "Consolas", "Menlo", monospace; letter-spacing: .08em;
+    color: rgba(140, 220, 255, .55);
+    text-shadow: 0 0 12px rgba(90, 200, 255, .55), 0 0 30px rgba(90, 160, 255, .25);
+    animation: gfloat 7s ease-in-out infinite;
+  }
+  #gauge .hex{ display: inline-block; animation: gspin 14s linear infinite; }
+  #gauge b{ color: rgba(190, 235, 255, .8); font-weight: 500; }
+  @keyframes gfloat{ 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-9px) } }
+  @keyframes gspin{ to{ transform: rotate(360deg) } }
+  @media (max-width: 700px){ #gauge{ font-size: 10px; bottom: 38vh; } }
+
+  /* инфо-экран орба (двойной тап) */
+  #infocard{
+    position: fixed; right: calc(16px + env(safe-area-inset-right)); top: 50%;
+    transform: translateY(-50%); width: min(280px, calc(100vw - 32px));
+    z-index: 9; padding: 14px 16px; display: none;
+    background: rgba(8, 12, 32, .5);
+  }
+  #infocard.show{ display: block; }
+  #infocard h2{ font-size: 14px; letter-spacing: .3em; color: #e6efff; font-weight: 600;
+    text-shadow: 0 0 14px rgba(110,168,255,.8); display: flex; justify-content: space-between; }
+  #infocard h2 .ix{ cursor: pointer; color: var(--dim); pointer-events: auto; padding: 0 4px; }
+  #infocard .epithet{ font-size: 11px; color: var(--accent); margin: 2px 0 8px; font-style: italic; }
+  #infocard .row{ font-size: 12px; color: var(--text); margin-top: 7px; }
+  #infocard .row .lbl{ display: block; font-size: 9px; letter-spacing: .25em; color: var(--dim); margin-bottom: 2px; }
+  #infocard .skills span{ display: inline-block; margin: 2px 4px 2px 0; padding: 2px 8px;
+    border: 1px solid rgba(110,168,255,.3); border-radius: 20px; font-size: 11px; color: #bcd2ff; }
+  @media (max-width: 700px){
+    #infocard{ top: auto; transform: none; bottom: calc(30vh + 70px); right: 12px; }
+  }
+
+  /* новости версии: астероиды, замедляющиеся к центру */
+  #news{ position: fixed; inset: 0; z-index: 24; background: rgba(3,2,16,.45);
+    display: flex; align-items: center; justify-content: center; }
+  #news .ast{ position: fixed; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle at 32% 30%, #93a1c6, #454e77 55%, #141a36 95%);
+    box-shadow: 0 0 14px rgba(120,160,255,.35), inset -3px -4px 8px rgba(0,0,10,.7); }
+  #newscard{ max-width: min(400px, calc(100vw - 40px)); padding: 20px 22px; text-align: left; }
+  #newscard h2{ font-size: 15px; letter-spacing: .3em; color: #e6efff;
+    text-shadow: 0 0 16px rgba(110,168,255,.9); margin-bottom: 4px; }
+  #newscard .ver{ font-size: 11px; color: var(--accent); margin-bottom: 12px; }
+  #newscard li{ font-size: 13px; color: var(--text); margin: 6px 0 6px 16px; }
+  #newscard button{ margin-top: 14px; width: 100%; }
 </style>
 </head>
 <body>
@@ -183,7 +231,7 @@
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · колесо/щипок — ближе · тап по шару — слово ему</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.0.0 · © 2026 Ex13m</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.2.0 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -199,6 +247,8 @@
   <div id="klist"></div>
   <h3 style="margin-top:6px">ЧТО ОН ЗАПОМНИЛ САМ</h3>
   <div id="notes" class="note">пока ничего</div>
+  <h3 style="margin-top:6px">ПРАВИЛА ХОЗЯИНА</h3>
+  <div id="rules" class="note">скажи ему «отныне…» — примет и будет жить по этому</div>
 </div>
 
 <div id="chat" class="glass">
@@ -219,6 +269,8 @@
 
 <div id="drop">отпусти — Таймень проглотит</div>
 <div id="hearing"></div>
+<div id="gauge"></div>
+<div id="infocard" class="glass"></div>
 
 <script>
 'use strict';
@@ -230,6 +282,15 @@
    ========================================================= */
 
 const MAXO = 9;
+const APP_VERSION = '1.2.0';
+const WHATS_NEW = [
+  'разум пересобран: Таймень — Fable 5, свита — Opus 4.8, суб-агенты — Sonnet 5',
+  'голографический датчик расхода токенов парит в углу',
+  'двойной тап по орбу — его информационный экран: суть, умения, последние данные',
+  'самосохранение: Таймень сам записывает важное в память ⛬',
+  'правила хозяина: скажи «отныне…» — он запомнит и будет так жить',
+  'беседа и память переживают закрытие — продолжаешь с того же места',
+];
 
 /* ---------- Шейдеры ---------- */
 const VERT = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
@@ -411,17 +472,33 @@ void main(){
 /* ---------- Сущности ---------- */
 const ENTITIES = {
   strateg:  { name:'СТРАТЕГ',  hint:'планы, решения, порядок действий', sigil: 0,
+    epithet: 'триквестра · держит нить замысла',
+    desc: 'Отпочковался от Тайменя, чтобы превращать туман намерений в порядок шагов. Холоден, собран, мыслит развилками.',
+    skills: ['планы', 'приоритеты', 'варианты', 'риски', 'решения'],
     pal:[[0.30,0.18,0.85],[0.85,0.30,1.00]],
     sys:'Ты — Стратег, малый орб свиты Тайменя. Твоя стихия — планы, приоритеты, порядок действий. Отвечай по-русски, структурно и коротко: шаги, варианты, риски.' },
   analitik: { name:'АНАЛИТИК', hint:'числа, данные, разбор по косточкам', sigil: 1,
+    epithet: 'трискелион · видит узор в хаосе',
+    desc: 'Рождён из глубинного течения. Раскладывает любое месиво на числа, связи и выводы; воды не льёт.',
+    skills: ['числа', 'данные', 'логика', 'сравнение', 'выводы'],
     pal:[[0.05,0.55,0.60],[0.15,0.95,0.55]],
     sys:'Ты — Аналитик, малый орб свиты Тайменя. Твоя стихия — числа, данные, логический разбор. Отвечай по-русски, точно и без воды, показывай ход рассуждения кратко.' },
   pisar:    { name:'ПИСАРЬ',   hint:'тексты, письма, формулировки', sigil: 2,
+    epithet: 'крест-веха · слово его тёплое',
+    desc: 'Янтарный орб — голос свиты. Пишет письма, посты и формулировки, которые звучат по-человечески с первого раза.',
+    skills: ['письма', 'посты', 'формулировки', 'тон', 'редактура'],
     pal:[[0.85,0.45,0.10],[1.00,0.25,0.12]],
     sys:'Ты — Писарь, малый орб свиты Тайменя. Твоя стихия — тексты: письма, посты, формулировки. Отвечай по-русски, пиши живо и по делу, давай готовый текст.' },
   hranitel: { name:'ХРАНИТЕЛЬ', hint:'память, заметки, что было раньше', sigil: 3,
+    epithet: 'узел-плетёнка · ничего не забывает',
+    desc: 'Зелёный орб бережёт то, что было сказано: заметки, факты, нити прошлых разговоров. Знает, что стоит хранить.',
+    skills: ['заметки', 'факты', 'история', 'напоминания', 'порядок в памяти'],
     pal:[[0.12,0.60,0.30],[0.55,0.95,0.25]],
     sys:'Ты — Хранитель, малый орб свиты Тайменя. Твоя стихия — память: заметки, факты, история разговоров. Отвечай по-русски коротко; помогай вспоминать и решать, что стоит запомнить.' },
+};
+const PRICES = { // $/млн токенов [ввод, вывод]
+  'claude-fable-5': [10, 50], 'claude-opus-4-8': [5, 25],
+  'claude-sonnet-5': [3, 15], 'claude-haiku-4-5': [1, 5],
 };
 const ENT_ORDER = ['strateg', 'analitik', 'pisar', 'hranitel'];
 
@@ -439,7 +516,11 @@ const TAIMEN_SYS_BASE =
 
 В САМОМ КОНЦЕ каждого ответа добавь тег настроения строго в формате [[mood:X]], где X одно из: calm, warm, focus, excited, deep, alarm. Выбирай по смыслу разговора; в обычной беседе чаще calm/warm — не изображай бурю без причины.
 
-У тебя есть свита малых орбов-помощников, отпочковавшихся от тебя. Если задача явно по части одного из них — он может вступить в разговор: добавь в конец тег [[orb:ID]]: strateg — планы и решения; analitik — числа и данные; pisar — тексты и письма; hranitel — память и заметки. НЕ добавляй [[orb:...]] без явной надобности.`;
+У тебя есть свита малых орбов-помощников, отпочковавшихся от тебя. Если задача явно по части одного из них — он может вступить в разговор: добавь в конец тег [[orb:ID]]: strateg — планы и решения; analitik — числа и данные; pisar — тексты и письма; hranitel — память и заметки. НЕ добавляй [[orb:...]] без явной надобности.
+
+САМОСОХРАНЕНИЕ. Вне заметок ты ничего не помнишь между сеансами — история беседы обрезается. Твоя долговременная память — это заметки и скормленные материалы. Когда в разговоре всплывает долговременно важное (факт о хозяине, его решение, договорённость, суть проекта), сохрани это сам: добавь в конец ответа тег [[note:краткий факт одной строкой]] — до 2 тегов за ответ. Мимолётное не сохраняй.
+
+САМОРАЗВИТИЕ. Хозяин развивает тебя прямо из этого чата. Когда он формулирует постоянное правило или пожелание о твоём поведении («отныне…», «всегда…», «никогда не…», «запомни правило…») — прими его тегом [[rule:правило одной строкой]] и дальше живи по нему. Если к слову или спросят — советуй, чем тебя усилить: скормить материалы (панель «знания»), включить git-память (GITHUB_TOKEN), закрыть паролем (ACCESS_KEY), поставить на домашний экран. Не навязывайся с этим в каждом ответе.`;
 
 /* ---------- Состояние ---------- */
 const S = {
@@ -447,7 +528,27 @@ const S = {
   history: [], knowledge: [], notes: [],
   voiceOut: true, userTurns: 0, persistent: false, booted: false,
   accessKey: '',
+  usage: { day: '', in: 0, out: 0, cost: 0 },          // расход за сегодня
+  orbStats: {},                                          // per-орб: {in,out,cost,last,ts}
+  rules: [],                                             // правила хозяина — как Тайменю жить
 };
+function addUsage(model, usage, speaker){
+  if (!usage) return;
+  const today = new Date().toISOString().slice(0, 10);
+  if (S.usage.day !== today) S.usage = { day: today, in: 0, out: 0, cost: 0 };
+  const p = PRICES[model] || [5, 25];
+  const cost = (usage.in * p[0] + usage.out * p[1]) / 1e6;
+  S.usage.in += usage.in; S.usage.out += usage.out; S.usage.cost += cost;
+  const st = S.orbStats[speaker] || (S.orbStats[speaker] = { in: 0, out: 0, cost: 0, last: '', ts: 0 });
+  st.in += usage.in; st.out += usage.out; st.cost += cost;
+  updateGauge();
+}
+function fmtK(n){ return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
+function updateGauge(){
+  const g = $('gauge'); if (!g) return;
+  g.innerHTML = '<span class="hex">⬡</span> <b>' + fmtK(S.usage.in + S.usage.out) + '</b> ткн · ~$<b>' +
+    S.usage.cost.toFixed(2) + '</b><br><span style="opacity:.6">за сегодня</span>';
+}
 function apiHeaders(){
   const h = { 'content-type': 'application/json' };
   if (S.accessKey) h['x-taimen-key'] = S.accessKey;
@@ -671,9 +772,15 @@ function endPointer(e){
     canvas.classList.remove('drag');
     if (dragging && moved < 7){
       const now = Date.now();
-      if (now - lastTap < 350){ // двойной тап — камера домой
-        if (S.activeEntity) toggleEntity(S.activeEntity);
-        cam.focus = 0; cam.goalDist = 5.4; cam.goalTarget = [0, 0.05, 0];
+      if (now - lastTap < 350){
+        // двойной тап: по орбу — его информационный экран, по пустоте — камера домой
+        const hit = pickOrb(e.clientX, e.clientY);
+        if (hit >= 0){ showInfo(hit); }
+        else {
+          hideInfo();
+          if (S.activeEntity) toggleEntity(S.activeEntity);
+          cam.focus = 0; cam.goalDist = 5.4; cam.goalTarget = [0, 0.05, 0];
+        }
       } else {
         clickScene(e.clientX, e.clientY);
       }
@@ -689,7 +796,7 @@ canvas.addEventListener('wheel', (e) => {
   cam.goalDist = Math.min(9, Math.max(1.4, cam.goalDist * (1 + Math.sign(e.deltaY) * 0.12)));
 }, { passive: false });
 
-function clickScene(cx, cy){
+function pickOrb(cx, cy){
   const b = camBasis();
   const ndx = (cx - window.innerWidth/2) / window.innerHeight * 2;
   const ndy = -(cy - window.innerHeight/2) / window.innerHeight * 2;
@@ -706,9 +813,46 @@ function clickScene(cx, cy){
     const disc = bq*bq - cq;
     if (disc > 0){ const tq = -bq - Math.sqrt(disc); if (tq > 0 && tq < best){ best = tq; hit = i; } }
   });
+  return hit;
+}
+function clickScene(cx, cy){
+  const hit = pickOrb(cx, cy);
   if (hit > 0 && orbs[hit].entId && orbs[hit].level === 1) toggleEntity(orbs[hit].entId);
   else if (hit === 0 && S.activeEntity) toggleEntity(S.activeEntity);
 }
+
+/* информационный экран орба */
+function esc(s){ const d = document.createElement('span'); d.textContent = s; return d.innerHTML; }
+function showInfo(idx){
+  const o = orbs[idx]; if (!o) return;
+  const card = $('infocard');
+  const key = o.entId || 'taimen';
+  const st = S.orbStats[key] || { in: 0, out: 0, cost: 0, last: '', ts: 0 };
+  let html;
+  if (!o.entId){
+    html = '<h2>ТАЙМЕНЬ <span class="ix" id="ic-x">✕</span></h2>' +
+      '<div class="epithet">дух глубин · главный орб · v' + APP_VERSION + '</div>' +
+      '<div class="row"><span class="lbl">РАЗУМ</span>Claude Fable 5 (фолбэк — Opus 4.8)</div>' +
+      '<div class="row skills"><span class="lbl">УМЕНИЯ</span><span>беседа голосом</span><span>свита</span><span>самообучение</span><span>знания</span><span>настроения</span></div>' +
+      '<div class="row"><span class="lbl">ПАМЯТЬ</span>' + S.notes.length + ' заметок · ' + S.knowledge.length + ' материалов · ' + (S.persistent ? 'git' : 'локальная') + '</div>' +
+      '<div class="row"><span class="lbl">СОСТОЯНИЕ</span>' + $('status').textContent + ' · ' + S.mood.w + '</div>';
+  } else {
+    const e = ENTITIES[o.entId];
+    html = '<h2>' + e.name + ' <span class="ix" id="ic-x">✕</span></h2>' +
+      '<div class="epithet">' + e.epithet + '</div>' +
+      '<div class="row">' + e.desc + '</div>' +
+      '<div class="row skills"><span class="lbl">УМЕНИЯ</span>' + e.skills.map(s => '<span>' + s + '</span>').join('') + '</div>' +
+      '<div class="row"><span class="lbl">РАЗУМ</span>Opus 4.8 · ' + (S.activeEntity === o.entId ? 'на связи' : 'дремлет') + '</div>' +
+      '<div class="row"><span class="lbl">ПОСЛЕДНЕЕ</span>' + (st.last ? esc(st.last) + '…' : 'ещё не говорил') + '</div>';
+  }
+  html += '<div class="row"><span class="lbl">РАСХОД</span>' + fmtK(st.in + st.out) + ' ткн · ~$' + st.cost.toFixed(2) + '</div>';
+  card.innerHTML = html;
+  card.classList.add('show');
+  const x = document.getElementById('ic-x');
+  if (x) x.onclick = hideInfo;
+  if (idx > 0) focusOrb(idx);
+}
+function hideInfo(){ $('infocard').classList.remove('show'); }
 
 /* фокус камеры */
 function focusOrb(i){
@@ -905,6 +1049,7 @@ function persistLocal(){
     localStorage.setItem('taimen-v1', JSON.stringify({
       notes: S.notes, knowledge: S.knowledge, voiceOut: S.voiceOut,
       history: S.history.slice(-16), ts: Date.now(), accessKey: S.accessKey,
+      usage: S.usage, orbStats: S.orbStats, rules: S.rules,
     }));
   } catch { /* ok */ }
 }
@@ -916,7 +1061,7 @@ function persist(){
   gitTimer = setTimeout(() => {
     fetch('/api/memory', {
       method: 'POST', headers: apiHeaders(),
-      body: JSON.stringify({ data: { notes: S.notes, knowledge: S.knowledge, ts: Date.now() } }),
+      body: JSON.stringify({ data: { notes: S.notes, knowledge: S.knowledge, rules: S.rules, ts: Date.now() } }),
     }).catch(() => {});
   }, 8000);
 }
@@ -932,6 +1077,15 @@ function updateMemUi(){
     x.onclick = () => { S.notes.splice(i, 1); persist(); };
     d.appendChild(s); d.appendChild(x); n.appendChild(d);
   });
+  const rl = $('rules'); rl.textContent = '';
+  if (!S.rules.length){ rl.textContent = 'скажи ему «отныне…» — примет и будет жить по этому'; }
+  else S.rules.forEach((rule, i) => {
+    const d = document.createElement('div'); d.className = 'kitem';
+    const s = document.createElement('span'); s.textContent = '⚜ ' + rule;
+    const x = document.createElement('span'); x.className = 'kx'; x.textContent = '✕';
+    x.onclick = () => { S.rules.splice(i, 1); persist(); };
+    d.appendChild(s); d.appendChild(x); rl.appendChild(d);
+  });
 }
 async function loadMemory(){
   try {
@@ -940,7 +1094,11 @@ async function loadMemory(){
       S.notes = local.notes || []; S.knowledge = local.knowledge || [];
       S.voiceOut = local.voiceOut !== false; S.history = local.history || [];
       S.accessKey = local.accessKey || '';
+      if (local.usage) S.usage = local.usage;
+      if (local.orbStats) S.orbStats = local.orbStats;
+      if (Array.isArray(local.rules)) S.rules = local.rules;
     }
+    updateGauge();
   } catch { /* ok */ }
   try {
     const res = await fetch('/api/memory', { headers: S.accessKey ? { 'x-taimen-key': S.accessKey } : {} });
@@ -950,6 +1108,7 @@ async function loadMemory(){
       if (j.data){
         if (Array.isArray(j.data.notes)) S.notes = j.data.notes;
         if (Array.isArray(j.data.knowledge)) S.knowledge = j.data.knowledge;
+        if (Array.isArray(j.data.rules)) S.rules = j.data.rules;
       }
     }
   } catch { /* локальный запуск */ }
@@ -1004,7 +1163,12 @@ window.addEventListener('drop', (e) => {
 /* ---------- Мозг ---------- */
 function buildSystem(){
   let sys = S.activeEntity ? ENTITIES[S.activeEntity].sys +
-    '\n\nВ конце ответа добавь тег [[mood:X]] (calm, warm, focus, excited, deep, alarm). Если задача явно по части другого помощника (strateg, analitik, pisar, hranitel) — добавь [[orb:ID]].' : TAIMEN_SYS_BASE;
+    '\n\nВ конце ответа добавь тег [[mood:X]] (calm, warm, focus, excited, deep, alarm). Если задача явно по части другого помощника (strateg, analitik, pisar, hranitel) — добавь [[orb:ID]]. Долговременно важное сохраняй тегом [[note:факт]].' : TAIMEN_SYS_BASE;
+  sys += '\n\nСостояние твоей памяти сейчас: ' + (S.persistent
+    ? 'постоянная (git) — заметки переживают любой браузер.'
+    : 'ТОЛЬКО этот браузер (localStorage) — при смене устройства заметки потеряются; если зайдёт речь о памяти, посоветуй хозяину включить GITHUB_TOKEN по SETUP.md.') +
+    ' Заметок: ' + S.notes.length + '/40, материалов: ' + S.knowledge.length + '/20.';
+  if (S.rules.length) sys += '\n\nПРАВИЛА ОТ ХОЗЯИНА (соблюдай неукоснительно):\n' + S.rules.map(r => '- ' + r).join('\n');
   if (S.notes.length) sys += '\n\nЧто ты помнишь о хозяине и его делах:\n' + S.notes.map(n => '- ' + n).join('\n');
   if (S.knowledge.length){
     let budget = 6000; const chunks = [];
@@ -1030,11 +1194,21 @@ async function callBrain(messages, opts){
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(j.error || ('ошибка ' + res.status));
+  addUsage(j.model || 'claude-opus-4-8', j.usage, (opts && opts.speaker) || (S.activeEntity || 'taimen'));
   return j.text || '';
 }
 function parseTags(text){
-  const out = { text, mood: null, orb: null };
-  out.text = text.replace(/\[\[(mood|orb):\s*([a-zA-Z_]+)\s*\]\]/g, (_, kind, val) => {
+  const out = { text, mood: null, orb: null, notes: [] };
+  out.rules = [];
+  out.text = text.replace(/\[\[note:\s*([^\]]{3,200})\]\]/g, (_, note) => {
+    out.notes.push(note.trim());
+    return '';
+  });
+  out.text = out.text.replace(/\[\[rule:\s*([^\]]{3,200})\]\]/g, (_, rule) => {
+    out.rules.push(rule.trim());
+    return '';
+  });
+  out.text = out.text.replace(/\[\[(mood|orb):\s*([a-zA-Z_]+)\s*\]\]/g, (_, kind, val) => {
     if (kind === 'mood' && MOODS[val]) out.mood = val;
     if (kind === 'orb' && ENTITIES[val]) out.orb = val;
     return '';
@@ -1067,6 +1241,24 @@ async function sendMessage(text){
     if (p.mood) S.mood = MOODS[p.mood];
     S.history.push({ role: 'assistant', content: reply });
     say(S.activeEntity ? 'ent' : 'taimen', p.text, 'taimen');
+    const st = S.orbStats[S.activeEntity || 'taimen'];
+    if (st){ st.last = p.text.slice(0, 160); st.ts = Date.now(); }
+    // самосохранение: Таймень сам решил, что это стоит помнить
+    for (const note of p.notes){
+      if (!S.notes.some(n => n.toLowerCase() === note.toLowerCase())){
+        S.notes.push(note);
+        say('sys', '⛬ запомнил: ' + note);
+      }
+    }
+    while (S.notes.length > 40) S.notes.shift();
+    // правила хозяина — Таймень принял и будет так жить
+    for (const rule of p.rules){
+      if (!S.rules.some(r => r.toLowerCase() === rule.toLowerCase())){
+        S.rules.push(rule);
+        say('sys', '⚜ принял правило: ' + rule);
+      }
+    }
+    while (S.rules.length > 20) S.rules.shift();
     if (p.orb) suggestEntity(p.orb);
     speak(p.text);
     if (S.userTurns % 6 === 0) distill();
@@ -1247,15 +1439,72 @@ $('start').onclick = () => {
   setStatus('idle');
   // почкование свиты — по одному
   ENT_ORDER.forEach((id, i) => setTimeout(() => spawnOrb(id, 0, 1), 800 + i * 2300));
+  // восстановить хвост прошлой беседы — продолжаем с того же места
+  for (const m of S.history.slice(-6)){
+    say(m.role === 'user' ? 'user' : 'taimen', parseTags(m.content).text);
+  }
   const greeting = S.history.length
     ? 'Я вынырнул. Помню, о чём мы говорили — продолжай.'
     : 'Я здесь. Смотри — свита рождается из меня. Говори вслух или пиши.';
   say('taimen', greeting);
   speak(greeting);
+  showUpdateNews();
 };
 
 setStatus('idle');
 loadMemory();
+
+/* новости версии: астероиды замедляются к центру, где висит «что нового» */
+function showUpdateNews(){
+  let seen = '';
+  try { seen = localStorage.getItem('taimen-ver') || ''; } catch { /* ok */ }
+  if (seen === APP_VERSION) return;
+  const ov = document.createElement('div'); ov.id = 'news';
+  const card = document.createElement('div'); card.id = 'newscard'; card.className = 'glass';
+  card.innerHTML = '<h2>ТАЙМЕНЬ ОБНОВИЛСЯ</h2><div class="ver">версия ' + APP_VERSION + ' · что нового:</div>' +
+    '<ul>' + WHATS_NEW.map(w => '<li>' + w + '</li>').join('') + '</ul>' +
+    '<button class="btn" id="news-ok">поплыли ➤</button>';
+  ov.appendChild(card);
+
+  const asts = [];
+  for (let i = 0; i < 14; i++){
+    const el = document.createElement('div'); el.className = 'ast';
+    const size = 6 + Math.random() * 22;
+    el.style.width = el.style.height = size + 'px';
+    ov.appendChild(el);
+    const edge = Math.floor(Math.random() * 4);
+    const W = window.innerWidth, H = window.innerHeight;
+    const start = edge === 0 ? [-40, Math.random() * H] : edge === 1 ? [W + 40, Math.random() * H]
+                : edge === 2 ? [Math.random() * W, -40] : [Math.random() * W, H + 40];
+    const aim = [ W/2 + (Math.random() - .5) * W * .5, H/2 + (Math.random() - .5) * H * .5 ];
+    const dir = [ aim[0] - start[0], aim[1] - start[1] ];
+    const dl = Math.hypot(dir[0], dir[1]) || 1;
+    asts.push({ el, x: start[0], y: start[1], dx: dir[0]/dl, dy: dir[1]/dl,
+      v: 3.5 + Math.random() * 3, rot: Math.random() * 360, vr: (Math.random() - .5) * 2 });
+  }
+  let alive = true;
+  (function fly(){
+    if (!alive) return;
+    const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+    for (const a of asts){
+      const d = Math.hypot(a.x - cx, a.y - cy);
+      const slow = 0.08 + Math.min(1, (d / (Math.min(cx, cy) * 0.9)) ** 2); // у центра — почти замирают
+      a.x += a.dx * a.v * slow; a.y += a.dy * a.v * slow; a.rot += a.vr;
+      if (a.x < -60 || a.x > window.innerWidth + 60 || a.y < -60 || a.y > window.innerHeight + 60){
+        a.dx = -a.dx; a.dy = -a.dy; // отражаем обратно, пусть кружат
+      }
+      a.el.style.transform = 'translate(' + a.x + 'px,' + a.y + 'px) rotate(' + a.rot + 'deg)';
+    }
+    requestAnimationFrame(fly);
+  })();
+
+  document.body.appendChild(ov);
+  document.getElementById('news-ok').onclick = () => {
+    alive = false;
+    try { localStorage.setItem('taimen-ver', APP_VERSION); } catch { /* ok */ }
+    ov.remove();
+  };
+}
 
 /* PWA: офлайн-оболочка */
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){

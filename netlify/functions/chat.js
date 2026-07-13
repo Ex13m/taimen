@@ -144,15 +144,18 @@ exports.handler = async (event) => {
     }
 
     const data = await res.json();
+    const usage = data.usage
+      ? { in: data.usage.input_tokens || 0, out: data.usage.output_tokens || 0 }
+      : null;
     if (data.stop_reason === 'refusal') {
-      return json(200, { text: 'Об этом я говорить не стану — спроси иначе.' });
+      return json(200, { text: 'Об этом я говорить не стану — спроси иначе.', usage, model: data.model || model });
     }
     const text = (data.content || [])
       .filter((b) => b.type === 'text')
       .map((b) => b.text)
       .join('\n')
       .trim();
-    return json(200, { text });
+    return json(200, { text, usage, model: data.model || model });
   } catch (e) {
     console.error('proxy failure', e && e.message);
     return json(502, { error: 'Связь с глубинами прервалась. Попробуй ещё раз.' });
