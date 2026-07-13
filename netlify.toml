@@ -2,6 +2,10 @@
   publish = "."
   functions = "netlify/functions"
 
+# Шпион-разведчик: сам ходит за новостями долголетия трижды в сутки
+[functions."scout"]
+  schedule = "17 2,10,18 * * *"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"

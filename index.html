@@ -232,7 +232,7 @@
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · колесо/щипок — ближе · тап по шару — слово ему</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.3.0 · © 2026 Ex13m</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.4.0 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -250,6 +250,8 @@
   <div id="notes" class="note">пока ничего</div>
   <h3 style="margin-top:6px">ПРАВИЛА ХОЗЯИНА</h3>
   <div id="rules" class="note">скажи ему «отныне…» — примет и будет жить по этому</div>
+  <h3 style="margin-top:6px">КНИГА ПОЖЕЛАНИЙ ☆</h3>
+  <div id="wishes" class="note">скажи «хочу, чтобы ты умел…» — ночной мастер воплотит кодом</div>
 </div>
 
 <div id="chat" class="glass">
@@ -283,13 +285,13 @@
    ========================================================= */
 
 const MAXO = 9;
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const WHATS_NEW = [
-  'родословная растёт: у Стратега отпочковался ШПИОН — разведка сведений',
-  'у Шпиона — субагент IMMORTAL: живой обратный отсчёт до бессмертия (до миллисекунд)',
-  'скорми Иммортала статьёй — рейтинг ±, сдвиг отсчёта, всё в его окне (двойной тап)',
-  'база проекта хранится в памяти Тайменя: localStorage + git-ветка taimen-memory',
-  'датчик токенов, правила хозяина и самосохранение — из прошлой версии, работают',
+  'АВТОНОМИЯ: Шпион сам ходит за новостями долголетия трижды в сутки и кормит Иммортала',
+  'ночной мастер: скажи «хочу, чтобы ты умел…» — ☆ пожелание, и ночью агент сам напишет код',
+  'бюджет-контроль: дневной лимит $ с допуском перерасхода строго 10%, датчик показывает %',
+  'доклады Шпиона при входе: что нашёл, пока тебя не было',
+  'книга пожеланий — в панели «✦ знания»',
 ];
 
 /* ---------- Шейдеры ---------- */
@@ -537,6 +539,8 @@ const TAIMEN_SYS_BASE =
 
 САМОСОХРАНЕНИЕ. Вне заметок ты ничего не помнишь между сеансами — история беседы обрезается. Твоя долговременная память — это заметки и скормленные материалы. Когда в разговоре всплывает долговременно важное (факт о хозяине, его решение, договорённость, суть проекта), сохрани это сам: добавь в конец ответа тег [[note:краткий факт одной строкой]] — до 2 тегов за ответ. Мимолётное не сохраняй.
 
+КНИГА ПОЖЕЛАНИЙ. Если хозяин просит новую возможность интерфейса или функцию, которой у тебя нет («хочу кнопку…», «сделай чтобы…», «добавь…») — запиши это тегом [[wish:краткое ТЗ одной строкой]] и скажи, что ночной мастер возьмётся. Не записывай то, что уже умеешь.
+
 САМОРАЗВИТИЕ. Хозяин развивает тебя прямо из этого чата. Когда он формулирует постоянное правило или пожелание о твоём поведении («отныне…», «всегда…», «никогда не…», «запомни правило…») — прими его тегом [[rule:правило одной строкой]] и дальше живи по нему. Если к слову или спросят — советуй, чем тебя усилить: скормить материалы (панель «знания»), включить git-память (GITHUB_TOKEN), закрыть паролем (ACCESS_KEY), поставить на домашний экран. Не навязывайся с этим в каждом ответе.`;
 
 /* ---------- Состояние ---------- */
@@ -550,6 +554,8 @@ const S = {
   rules: [],                                             // правила хозяина — как Тайменю жить
   // база проекта IMMORTAL: базовая оценка LEV ~2045, статьи сдвигают отсчёт
   immortal: { baseTs: Date.UTC(2045, 0, 1), shiftMs: 0, analyses: [] },
+  wishes: [],                                            // книга пожеланий для ночного мастера
+  serverBudget: null,
 };
 function immortalTarget(){ return S.immortal.baseTs + S.immortal.shiftMs; }
 function addUsage(model, usage, speaker){
@@ -566,8 +572,14 @@ function addUsage(model, usage, speaker){
 function fmtK(n){ return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
 function updateGauge(){
   const g = $('gauge'); if (!g) return;
+  let extra = 'за сегодня';
+  if (S.serverBudget && S.serverBudget.limit){
+    const pct = Math.round(S.serverBudget.spent / S.serverBudget.limit * 100);
+    extra = 'бюджет: ' + pct + '% из $' + S.serverBudget.limit + ' (+10% допуск)';
+    g.style.color = pct >= 100 ? 'rgba(255,140,120,.75)' : pct >= 80 ? 'rgba(255,220,140,.7)' : '';
+  }
   g.innerHTML = '<span class="hex">⬡</span> <b>' + fmtK(S.usage.in + S.usage.out) + '</b> ткн · ~$<b>' +
-    S.usage.cost.toFixed(2) + '</b><br><span style="opacity:.6">за сегодня</span>';
+    S.usage.cost.toFixed(2) + '</b><br><span style="opacity:.6">' + extra + '</span>';
 }
 function apiHeaders(){
   const h = { 'content-type': 'application/json' };
@@ -1167,7 +1179,7 @@ function persistLocal(){
     localStorage.setItem('taimen-v1', JSON.stringify({
       notes: S.notes, knowledge: S.knowledge, voiceOut: S.voiceOut,
       history: S.history.slice(-16), ts: Date.now(), accessKey: S.accessKey,
-      usage: S.usage, orbStats: S.orbStats, rules: S.rules, immortal: S.immortal,
+      usage: S.usage, orbStats: S.orbStats, rules: S.rules, immortal: S.immortal, wishes: S.wishes,
     }));
   } catch { /* ok */ }
 }
@@ -1179,7 +1191,7 @@ function persist(){
   gitTimer = setTimeout(() => {
     fetch('/api/memory', {
       method: 'POST', headers: apiHeaders(),
-      body: JSON.stringify({ data: { notes: S.notes, knowledge: S.knowledge, rules: S.rules, immortal: S.immortal, ts: Date.now() } }),
+      body: JSON.stringify({ data: { notes: S.notes, knowledge: S.knowledge, rules: S.rules, immortal: S.immortal, wishes: S.wishes, scout: S._scout, ts: Date.now() } }),
     }).catch(() => {});
   }, 8000);
 }
@@ -1204,6 +1216,15 @@ function updateMemUi(){
     x.onclick = () => { S.rules.splice(i, 1); persist(); };
     d.appendChild(s); d.appendChild(x); rl.appendChild(d);
   });
+  const wl = $('wishes'); wl.textContent = '';
+  if (!S.wishes.length){ wl.textContent = 'скажи «хочу, чтобы ты умел…» — ночной мастер воплотит кодом'; }
+  else S.wishes.forEach((w, i) => {
+    const d = document.createElement('div'); d.className = 'kitem';
+    const s = document.createElement('span'); s.textContent = '☆ ' + w.text;
+    const x = document.createElement('span'); x.className = 'kx'; x.textContent = '✕';
+    x.onclick = () => { S.wishes.splice(i, 1); persist(); };
+    d.appendChild(s); d.appendChild(x); wl.appendChild(d);
+  });
 }
 async function loadMemory(){
   try {
@@ -1216,6 +1237,7 @@ async function loadMemory(){
       if (local.orbStats) S.orbStats = local.orbStats;
       if (Array.isArray(local.rules)) S.rules = local.rules;
       if (local.immortal && local.immortal.baseTs) S.immortal = local.immortal;
+      if (Array.isArray(local.wishes)) S.wishes = local.wishes;
     }
     updateGauge();
   } catch { /* ok */ }
@@ -1229,6 +1251,14 @@ async function loadMemory(){
         if (Array.isArray(j.data.knowledge)) S.knowledge = j.data.knowledge;
         if (Array.isArray(j.data.rules)) S.rules = j.data.rules;
         if (j.data.immortal && j.data.immortal.baseTs) S.immortal = j.data.immortal;
+        if (Array.isArray(j.data.wishes)) S.wishes = j.data.wishes;
+        if (j.data.scout){
+          S._scout = j.data.scout; // не перетирать труды разведчика при записи
+          if (j.data.scout.lastReport && j.data.scout.lastRun > (parseInt(localStorage.getItem('taimen-scout-seen') || '0', 10))){
+            say('sys', '🕵 ' + j.data.scout.lastReport + ' — журнал в окне Иммортала');
+            try { localStorage.setItem('taimen-scout-seen', String(j.data.scout.lastRun)); } catch { /* ok */ }
+          }
+        }
       }
     }
   } catch { /* локальный запуск */ }
@@ -1322,6 +1352,7 @@ async function callBrain(messages, opts){
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(j.error || ('ошибка ' + res.status));
   addUsage(j.model || 'claude-opus-4-8', j.usage, (opts && opts.speaker) || (S.activeEntity || 'taimen'));
+  if (j.budget) { S.serverBudget = j.budget; updateGauge(); }
   return j.text || '';
 }
 function parseTags(text){
@@ -1333,6 +1364,11 @@ function parseTags(text){
   });
   out.text = out.text.replace(/\[\[rule:\s*([^\]]{3,200})\]\]/g, (_, rule) => {
     out.rules.push(rule.trim());
+    return '';
+  });
+  out.wishes = [];
+  out.text = out.text.replace(/\[\[wish:\s*([^\]]{3,300})\]\]/g, (_, w) => {
+    out.wishes.push(w.trim());
     return '';
   });
   out.text = out.text.replace(/\[\[(mood|orb):\s*([a-zA-Z_]+)\s*\]\]/g, (_, kind, val) => {
@@ -1386,6 +1422,14 @@ async function sendMessage(text){
       }
     }
     while (S.rules.length > 20) S.rules.shift();
+    // книга пожеланий: ночной мастер заберёт и воплотит кодом
+    for (const w of p.wishes){
+      if (!S.wishes.some(x => x.text.toLowerCase() === w.toLowerCase())){
+        S.wishes.push({ text: w, ts: Date.now() });
+        say('sys', '☆ в книгу пожеланий: ' + w + ' — ночной мастер возьмётся');
+      }
+    }
+    while (S.wishes.length > 30) S.wishes.shift();
     if (p.orb) suggestEntity(p.orb);
     speak(p.text);
     if (S.userTurns % 6 === 0) distill();

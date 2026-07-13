@@ -21,10 +21,16 @@ const MAX_BODY_BYTES = 32 * 1024; // 32KB
 const MAX_MESSAGES = 16;
 const MIN_INTERVAL_MS = 2000; // >=2с между запросами с одного IP
 
+// Цены $/млн токенов [ввод, вывод] — для бюджет-контроля
+const PRICES = {
+  'claude-fable-5': [10, 50], 'claude-opus-4-8': [5, 25],
+  'claude-sonnet-5': [3, 15], 'claude-haiku-4-5': [1, 5],
+};
+
 // Ограничитель в памяти инстанса функции. Не переживает холодный старт —
 // «мягкий» лимит, достаточный для v1 (жёсткий вариант — TODO.md).
 const lastHit = new Map(); // ip -> ts
-let daily = { day: '', count: 0 };
+let daily = { day: '', count: 0, cost: 0 };
 
 function json(statusCode, obj) {
   return {
@@ -99,10 +105,15 @@ exports.handler = async (event) => {
   if (lastHit.size > 500) for (const [k, t] of lastHit) if (now - t > MIN_INTERVAL_MS) lastHit.delete(k); // не копим мусор
 
   const today = new Date().toISOString().slice(0, 10);
-  if (daily.day !== today) daily = { day: today, count: 0 };
+  if (daily.day !== today) daily = { day: today, count: 0, cost: 0 };
   const limit = parseInt(process.env.DAILY_LIMIT, 10) || 200;
   if (daily.count >= limit) {
     return json(429, { error: 'Таймень отдыхает до завтра — дневной лимит разговоров исчерпан.' });
+  }
+  // Бюджет в деньгах: DAILY_COST_LIMIT (дефолт $5) + допуск перерасхода 10%.
+  const costLimit = parseFloat(process.env.DAILY_COST_LIMIT) || 5;
+  if (daily.cost >= costLimit * 1.1) {
+    return json(429, { error: 'Дневной бюджет Тайменя исчерпан (' + costLimit + '$ +10%). До завтра.' });
   }
   daily.count += 1;
 
@@ -147,15 +158,21 @@ exports.handler = async (event) => {
     const usage = data.usage
       ? { in: data.usage.input_tokens || 0, out: data.usage.output_tokens || 0 }
       : null;
+    if (usage) {
+      const p = PRICES[data.model] || PRICES[model] || [5, 25];
+      daily.cost += (usage.in * p[0] + usage.out * p[1]) / 1e6;
+    }
+    const costLimit2 = parseFloat(process.env.DAILY_COST_LIMIT) || 5;
+    const budget = { spent: Math.round(daily.cost * 100) / 100, limit: costLimit2 };
     if (data.stop_reason === 'refusal') {
-      return json(200, { text: 'Об этом я говорить не стану — спроси иначе.', usage, model: data.model || model });
+      return json(200, { text: 'Об этом я говорить не стану — спроси иначе.', usage, model: data.model || model, budget });
     }
     const text = (data.content || [])
       .filter((b) => b.type === 'text')
       .map((b) => b.text)
       .join('\n')
       .trim();
-    return json(200, { text, usage, model: data.model || model });
+    return json(200, { text, usage, model: data.model || model, budget });
   } catch (e) {
     console.error('proxy failure', e && e.message);
     return json(502, { error: 'Связь с глубинами прервалась. Попробуй ещё раз.' });

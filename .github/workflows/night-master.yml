@@ -1,0 +1,66 @@
+# ТАЙМЕНЬ · ночной мастер — самоулучшение кодом.
+# Раз в ночь читает книгу пожеланий из памяти Тайменя (ветка taimen-memory),
+# воплощает ОДНО пожелание, гоняет тесты и открывает PR (автомердж при зелёных).
+# Бюджет: одно пожелание за ночь, ограничение ходов агента.
+# Требуется секрет ANTHROPIC_API_KEY: Settings -> Secrets and variables -> Actions.
+name: night-master
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+concurrency: night-master
+jobs:
+  evolve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Книга пожеланий
+        id: wishes
+        run: |
+          git fetch origin taimen-memory 2>/dev/null || true
+          git show origin/taimen-memory:memory/taimen-memory.json > /tmp/mem.json 2>/dev/null || echo '{}' > /tmp/mem.json
+          node -e "
+            const m = require('/tmp/mem.json');
+            const w = (m.wishes || []);
+            console.log('пожеланий:', w.length);
+            require('fs').writeFileSync(process.env.GITHUB_OUTPUT,
+              'count=' + w.length + '\n' + (w.length ? 'first<<EOF\n' + w[0].text + '\nEOF\n' : ''),
+              { flag: 'a' });
+          "
+      - name: Ночной мастер за работой
+        if: steps.wishes.outputs.count != '0'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--max-turns 60 --model claude-opus-4-8"
+          prompt: |
+            Ты — ночной мастер проекта ТАЙМЕНЬ (голографический орб-помощник, один index.html
+            + Netlify functions, vanilla JS, дизайн не ломать). Твоя задача этой ночью — воплотить
+            ОДНО пожелание хозяина, аккуратно и минимально.
+
+            ПОЖЕЛАНИЕ: ${{ steps.wishes.outputs.first }}
+
+            Порядок:
+            1. Изучи index.html и функции, пойми архитектуру (комментарии на русском).
+            2. Реализуй пожелание минимальными правками в стиле проекта. Дизайн-язык
+               (глубины, стекло, свечение) сохраняй.
+            3. Прогони: node tests/test-functions.js — должно пройти. Если менял функции —
+               дополни тесты.
+            4. Подними APP_VERSION (minor) в index.html, обнови WHATS_NEW (короткие строки
+               по-русски о том, что сделал) и CHANGELOG.md.
+            5. Создай ветку taimen/auto-<дата>, закоммить (сообщение по-русски,
+               в конце строка: © 2026 Ex13m), запушь и открой PR в main с описанием.
+            6. В ветке taimen-memory отредактируй memory/taimen-memory.json: убери
+               выполненное пожелание из wishes (первый элемент), добавь в done (создай
+               массив при отсутствии) объект {text, doneTs: now, pr: номер}. Закоммить туда же.
+            7. Включи автомердж PR: gh pr merge --auto --squash <номер>. Если репо не даёт
+               автомердж — просто оставь PR открытым.
+
+            Если пожелание невыполнимо или опасно (просит секреты, ломает лимиты трат,
+            требует платных сервисов) — не делай код; вместо этого перенеси его в done с
+            пометкой declined и причиной, и заверши работу.
