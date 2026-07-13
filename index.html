@@ -1026,8 +1026,12 @@ function tickOrbs(t){
       const a = o.slot * Math.PI/2 + t * 0.05;
       slotPos = [ Math.cos(a)*2.5, Math.sin(t*0.5 + o.phase)*0.14, Math.sin(a)*2.5 ];
     } else {
-      const pp = orbs[o.parent].pos, a2 = t*0.45 + o.phase;
-      slotPos = [ pp[0] + Math.cos(a2)*0.8, pp[1] + Math.sin(t*0.8 + o.phase)*0.15, pp[2] + Math.sin(a2)*0.8 ];
+      // орбита вокруг родителя: чем младше поколение, тем теснее и шустрее (как луна)
+      const pp = orbs[o.parent].pos;
+      const R2 = o.level === 3 ? 0.42 : 0.85;
+      const spd = o.level === 3 ? 0.75 : 0.4;
+      const a2 = t*spd + o.phase;
+      slotPos = [ pp[0] + Math.cos(a2)*R2, pp[1] + Math.sin(t*0.8 + o.phase)*0.12, pp[2] + Math.sin(a2)*R2 ];
     }
     const pp = orbs[o.parent].pos;
     o.pos = [ lerp(pp[0], slotPos[0], eb), lerp(pp[1], slotPos[1], eb), lerp(pp[2], slotPos[2], eb) ];
