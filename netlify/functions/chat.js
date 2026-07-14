@@ -28,9 +28,12 @@ const MIN_INTERVAL_MS = 2000; // >=2с между запросами с одно
 //  · Replicate (replicate.com) — открытые модели за копейки, REPLICATE_API_TOKEN.
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat-v3-0324:free';
+// не-:free модель OpenRouter тоже учитываем в бюджете — консервативно ($/млн),
+// чтобы платная модель не молотила мимо дневной отсечки
+const OPENROUTER_PRICE = (process.env.OPENROUTER_PRICE || '3,15').split(',').map(Number);
 const REPLICATE_URL = 'https://api.replicate.com/v1/models/';
 const REPLICATE_MODEL = process.env.REPLICATE_MODEL || 'meta/meta-llama-3-70b-instruct';
-const REPLICATE_PRICE = [0.65, 2.75]; // $/млн токенов (llama-3-70b)
+const REPLICATE_PRICE = (process.env.REPLICATE_PRICE || '0.65,2.75').split(',').map(Number); // $/млн (дефолт llama-3-70b)
 
 // Цены $/млн токенов [ввод, вывод] — для бюджет-контроля
 const PRICES = {
@@ -88,8 +91,10 @@ async function askOpenRouter(messages, system, maxTokens) {
   const text = ((((data.choices || [])[0] || {}).message || {}).content || '').trim();
   if (!text) return { error: 'Запасной мозг промолчал. Попробуй ещё раз.' };
   const u = data.usage || {};
-  return { text, usage: { in: u.prompt_tokens || 0, out: u.completion_tokens || 0 },
-    model: 'openrouter/' + (data.model || OPENROUTER_MODEL), cost: 0 }; // :free — $0
+  const usage = { in: u.prompt_tokens || 0, out: u.completion_tokens || 0 };
+  const free = OPENROUTER_MODEL.endsWith(':free');
+  return { text, usage, model: 'openrouter/' + (data.model || OPENROUTER_MODEL),
+    cost: free ? 0 : (usage.in * OPENROUTER_PRICE[0] + usage.out * OPENROUTER_PRICE[1]) / 1e6 };
 }
 
 // Запасной мозг №2: Replicate. История склеивается в диалог,
@@ -127,6 +132,10 @@ async function askReplicate(messages, system, maxTokens) {
       : 'Запасной мозг сейчас недоступен. Попробуй ещё раз.' };
   }
   const pred = await res.json();
+  if (pred.status === 'failed' || pred.status === 'canceled') {
+    console.error('replicate prediction failed', pred.error || pred.status);
+    return { error: 'Запасной мозг споткнулся. Попробуй ещё раз.' };
+  }
   if (pred.status !== 'succeeded' && !(Array.isArray(pred.output) && pred.output.length)) {
     return { error: 'Запасной мозг прогревается (холодный старт) — повтори через полминуты.' };
   }

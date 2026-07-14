@@ -21,6 +21,8 @@ function ev(method, body, ip) {
 (async () => {
   process.env.ANTHROPIC_API_KEY = 'sk-test';
   process.env.DAILY_LIMIT = '5';
+  delete process.env.OPENROUTER_API_KEY; // чистое окружение: запаски включаются
+  delete process.env.REPLICATE_API_TOKEN; // только в своих тестах
 
   // 405 не-POST
   let r = await chat.handler(ev('GET', null));
@@ -150,6 +152,13 @@ function ev(method, body, ip) {
   assert.ok(jb2.model.indexOf('replicate/') === 0, 'модель помечена replicate/');
   assert.ok(fetchCalls[0].url.includes('replicate.com'), 'запрос ушёл в Replicate');
   assert.ok(JSON.parse(fetchCalls[0].opts.body).input.prompt.includes('Хозяин: x'), 'история склеена в диалог');
+
+  // failed-предикт Replicate с частичным output НЕ выдаётся как ответ
+  global.fetch = async () => ({ ok: true, status: 200, json: async () => ({
+    status: 'failed', error: 'OOM', output: ['обры'] }) });
+  r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'x' }] }, '10.0.0.33'));
+  assert.equal(r.statusCode, 502, 'failed-предикт -> 502');
+  assert.ok(JSON.parse(r.body).error.includes('споткнулся'), 'человеческий текст ошибки');
   delete process.env.REPLICATE_API_TOKEN;
 
   // tts заглушка

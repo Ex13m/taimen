@@ -233,14 +233,13 @@
     box-shadow: 0 0 18px rgba(110,168,255,.35), inset 0 0 14px rgba(90,130,255,.25);
     cursor: pointer; touch-action: none;
     display: flex; align-items: center; justify-content: center;
-    transition: box-shadow .3s, transform .2s;
+    transition: box-shadow .3s, transform .2s, opacity 1.2s;
   }
   #helm::after{ content: ''; width: 18px; height: 18px; border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #cfe0ff, #6ea8ff 60%, #1a2a66);
     box-shadow: 0 0 12px rgba(140,190,255,.9); }
   #helm.armed{ transform: scale(1.12); box-shadow: 0 0 34px rgba(110,168,255,.75); }
   body.zen #helm{ opacity: .25; }
-  #helm, .helmnode{ transition: opacity 1.2s; }
   .helmnode{
     position: fixed; z-index: 11; transform: translate(-50%, -50%) scale(.4);
     width: 54px; height: 54px; border-radius: 50%;
@@ -615,7 +614,10 @@ function addUsage(model, usage, speaker){
   if (!usage) return;
   const today = new Date().toISOString().slice(0, 10);
   if (S.usage.day !== today) S.usage = { day: today, in: 0, out: 0, cost: 0 };
-  const p = PRICES[model] || [5, 25];
+  // запасной мозг: openrouter/:free — $0, replicate — копейки; иначе цена модели
+  const p = model.indexOf('openrouter/') === 0 ? [0, 0]
+    : model.indexOf('replicate/') === 0 ? [0.65, 2.75]
+    : PRICES[model] || [5, 25];
   const cost = (usage.in * p[0] + usage.out * p[1]) / 1e6;
   S.usage.in += usage.in; S.usage.out += usage.out; S.usage.cost += cost;
   const st = S.orbStats[speaker] || (S.orbStats[speaker] = { in: 0, out: 0, cost: 0, last: '', ts: 0 });
@@ -1835,8 +1837,8 @@ function helmSpawn(def, x, y, depth, delay){
   el.innerHTML = '<span>' + def.icon + '</span><span class="hl">' + def.label + '</span>';
   el.style.left = x + 'px'; el.style.top = y + 'px';
   document.body.appendChild(el);
-  setTimeout(() => el.classList.add('in'), 16 + delay);
-  helmNodes.push({ el, x, y, def, depth, expanded: false });
+  const tmr = setTimeout(() => el.classList.add('in'), 16 + delay);
+  helmNodes.push({ el, x, y, def, depth, expanded: false, tmr });
 }
 function helmFan(defs, cx, cy, baseAng, depth){
   const R = defs.length > 5 ? 108 : 92;
@@ -1874,9 +1876,11 @@ function helmHandleXY(){
   const r = helmEl.getBoundingClientRect();
   return [r.left + r.width / 2, r.top + r.height / 2];
 }
-function helmKill(n){ n.el.classList.remove('in'); setTimeout(() => n.el.remove(), 240); }
+function helmKill(n){ clearTimeout(n.tmr); n.el.classList.remove('in'); setTimeout(() => n.el.remove(), 240); }
 function helmExpand(n){
   helmNodes = helmNodes.filter(k => { if (k.depth > n.depth){ helmKill(k); return false; } return true; });
+  // соседняя ветка сворачивается — её можно раскрыть снова
+  helmNodes.forEach(k => { if (k.depth === n.depth && k !== n) k.expanded = false; });
   helmNodes.forEach(k => k.el.classList.toggle('dim', k.depth === n.depth && k !== n));
   const [hx, hy] = helmHandleXY();
   helmFan(n.def.kids, n.x, n.y, Math.atan2(n.y - hy, n.x - hx), n.depth + 1);
@@ -1936,6 +1940,7 @@ function helmClose(execute){
 }
 helmEl.addEventListener('pointerdown', (e) => {
   e.preventDefault(); e.stopPropagation();
+  if (helmPid !== null) return; // жест уже идёт — второй палец не крадёт штурвал
   wakeUi(); sndInit();
   helmPid = e.pointerId; helmT0 = performance.now();
   try { helmEl.setPointerCapture(e.pointerId); } catch { /* ok */ }
