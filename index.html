@@ -88,7 +88,7 @@
 
   #inrow{ display: flex; gap: 8px; align-items: center; }
   #inp{
-    flex: 1; background: rgba(8,10,26,.6); border: 1px solid var(--glass-line);
+    flex: 1; min-width: 0; background: rgba(8,10,26,.6); border: 1px solid var(--glass-line);
     border-radius: 10px; padding: 10px 12px; color: var(--text); font: inherit; outline: none;
   }
   #inp:focus{ border-color: rgba(110,168,255,.55); }
@@ -131,7 +131,7 @@
   #boot.gone{ opacity: 0; pointer-events: none; }
   #boot h1{ font-size: 30px; letter-spacing: .5em; font-weight: 300; color: #e6efff; text-shadow: 0 0 40px rgba(110,168,255,.9); padding-left: .5em; }
   #boot p{ color: var(--dim); font-size: 13px; max-width: 320px; text-align: center; }
-  #start{
+  #start-unused{
     font-size: 16px; letter-spacing: .3em; padding: 14px 44px 14px 48px; border-radius: 40px;
     background: rgba(20,28,64,.5); border: 1px solid rgba(110,168,255,.5); color: #e6efff; cursor: pointer;
     box-shadow: 0 0 30px rgba(110,168,255,.25); transition: box-shadow .3s;
@@ -161,8 +161,10 @@
     #hud{ padding: 9px 12px; }
     #memchip{ font-size: 11px; }
     #camhint{ display: none; }
-    .btn{ padding: 12px 15px; font-size: 17px; }
-    #inp{ padding: 12px 13px; font-size: 16px; } /* 16px — чтобы iOS не зумил */
+    #inrow{ gap: 5px; }
+    .btn{ padding: 11px 11px; font-size: 16px; }
+    #chat{ padding: 8px 8px 10px; }
+    #inp{ padding: 11px 10px; font-size: 16px; } /* 16px — чтобы iOS не зумил */
     #hearing{ font-size: 18px; bottom: 26vh; }
     /* на телефоне кнопка «знания» уходит из зоны чата под HUD */
     #knowbtn{ bottom: auto; top: calc(112px + env(safe-area-inset-top)); }
@@ -221,6 +223,43 @@
     #infocard h2 .ix{ padding: 6px 10px; font-size: 16px; }
   }
 
+  /* штурвал: одним пальцем по дереву команд */
+  #helm{
+    position: fixed; left: calc(14px + env(safe-area-inset-left));
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    width: 56px; height: 56px; border-radius: 50%; z-index: 11;
+    background: radial-gradient(circle at 34% 30%, rgba(140,180,255,.35), rgba(30,40,90,.55) 55%, rgba(8,12,32,.8));
+    border: 1px solid rgba(120,160,255,.45);
+    box-shadow: 0 0 18px rgba(110,168,255,.35), inset 0 0 14px rgba(90,130,255,.25);
+    cursor: pointer; touch-action: none;
+    display: flex; align-items: center; justify-content: center;
+    transition: box-shadow .3s, transform .2s;
+  }
+  #helm::after{ content: ''; width: 18px; height: 18px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #cfe0ff, #6ea8ff 60%, #1a2a66);
+    box-shadow: 0 0 12px rgba(140,190,255,.9); }
+  #helm.armed{ transform: scale(1.12); box-shadow: 0 0 34px rgba(110,168,255,.75); }
+  body.zen #helm{ opacity: .25; }
+  #helm, .helmnode{ transition: opacity 1.2s; }
+  .helmnode{
+    position: fixed; z-index: 11; transform: translate(-50%, -50%) scale(.4);
+    width: 54px; height: 54px; border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(10, 14, 34, .6); border: 1px solid var(--glass-line);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: var(--text); font-size: 19px; pointer-events: none;
+    opacity: 0; transition: transform .18s cubic-bezier(.2,1.6,.4,1), opacity .15s, border-color .15s, box-shadow .15s;
+  }
+  .helmnode .hl{ font-size: 7px; letter-spacing: .14em; color: var(--dim); margin-top: 1px; white-space: nowrap; }
+  .helmnode.in{ opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  .helmnode.hover{
+    border-color: var(--accent); box-shadow: 0 0 22px rgba(110,168,255,.65);
+    transform: translate(-50%, -50%) scale(1.22); color: #fff;
+  }
+  .helmnode.hover .hl{ color: #cfe0ff; }
+  .helmnode.dim{ opacity: .35; }
+  .helmnode.dim.hover{ opacity: 1; }
+
   /* новости версии: астероиды, замедляющиеся к центру */
   #news{ position: fixed; inset: 0; z-index: 24; background: rgba(3,2,16,.45);
     display: flex; align-items: center; justify-content: center; }
@@ -246,7 +285,7 @@
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · колесо/щипок — ближе · тап по шару — слово ему</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.6.0 · © 2026 Ex13m</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.7.0 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -274,20 +313,19 @@
     <button id="mic" class="btn" title="говорить">🎙</button>
     <input id="inp" placeholder="скажи или напиши…" autocomplete="off">
     <button id="send" class="btn" title="отправить">➤</button>
-    <button id="nav" class="btn" title="наведение: следующий орб">◎</button>
     <button id="spk" class="btn" title="голос Тайменя вкл/выкл">🔊</button>
   </div>
 </div>
 
 <div id="boot">
   <h1>TAIMEN</h1>
-  <p>timing × men · дух глубин в живом орбе. слушает, говорит, помнит; помощники почкуются от него, когда нужны.</p>
-  <button id="start">ЗАПУСК</button>
+  <p>timing × men</p>
 </div>
 
 <div id="drop">отпусти — Таймень проглотит</div>
 <div id="hearing"></div>
 <div id="gauge"></div>
+<div id="helm" title="штурвал: прижми и веди"></div>
 <div id="infocard" class="glass"></div>
 
 <script>
@@ -300,13 +338,13 @@
    ========================================================= */
 
 const MAXO = 9;
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 const WHATS_NEW = [
-  'взрывное рождение свиты: все разом, с глубинным гулом и отъездом камеры',
-  'скорость: простые вопросы — быстрый разум (Sonnet 5); скажи «подумай…» — глубокий (Fable 5)',
-  'наведение: голосом «покажи иммортала» / «покажи всех», кнопка ◎ листает орбы',
-  'орбиты: полные 360° с наклоном; Стратег держится ближе к дому',
-  'в малые шары легко попасть пальцем',
+  '⎈ штурвал (светящаяся рукоять слева): прижми и, не отпуская, веди палец по дереву команд — орбы, вид, голос, знания, звук; камера подсматривает то, что под пальцем',
+  'жизнь начинается сама: без кнопки — заставка, новости, взрывное почкование',
+  'запасной мозг: при недоступном Anthropic отвечают бесплатные модели OpenRouter (или Replicate)',
+  'звук рождения: глубинный гул разлёта и щелчки отрыва',
+  'камера больше не ныряет внутрь шара; кнопки не убегают за край экрана',
 ];
 
 /* ---------- Шейдеры ---------- */
@@ -1031,7 +1069,7 @@ function tickOrbs(t){
   orbs.forEach((o, i) => {
     if (i === 0) return;
     // почкование: набухает в родителе -> вытягивается шейкой -> отрывается со щелчком
-    const birth = Math.min((t - o.birthT) / 2.2, 1);
+    const birth = Math.min((t - o.birthT) / 4.4, 1);
     const swell = Math.min(birth / 0.5, 1);
     const pull = Math.min(Math.max((birth - 0.38) / 0.62, 0), 1);
     const bo = pull >= 1 ? 1 : 1 + 2.70158 * Math.pow(pull - 1, 3) + 1.70158 * Math.pow(pull - 1, 2); // overshoot
@@ -1081,7 +1119,7 @@ function tickOrbs(t){
   // теснота: задевают друг друга — орбиты расходятся (родитель-дитя не считаем)
   for (let i = 1; i < orbs.length; i++){
     const oi = orbs[i];
-    if ((t - oi.birthT) < 2.2) continue;
+    if ((t - oi.birthT) < 4.4) continue;
     let crowded = false;
     for (let j = 0; j < orbs.length; j++){
       if (i === j || oi.parent === j || orbs[j].parent === i) continue;
@@ -1101,6 +1139,9 @@ function tickOrbs(t){
   cam.target[0] = lerp(cam.target[0], cam.goalTarget[0], 0.04);
   cam.target[1] = lerp(cam.target[1], cam.goalTarget[1], 0.04);
   cam.target[2] = lerp(cam.target[2], cam.goalTarget[2], 0.04);
+  const fo2 = orbs[Math.max(cam.focus, 0)] || orbs[0];
+  const floor2 = (fo2 ? fo2.rad : 1) * 1.55;
+  if (cam.goalDist < floor2) cam.goalDist = floor2;
   cam.dist = lerp(cam.dist, cam.goalDist, 0.05);
   // инерция облёта
   if (!dragging && (Math.abs(vyaw) > 1e-4 || Math.abs(vpitch) > 1e-4)){
@@ -1736,14 +1777,6 @@ function speak(text){
     speechSynthesis.speak(u);
   } catch { setStatus('idle'); }
 }
-/* компас: тапами листаем орбы по кругу (или голосом: «покажи иммортала») */
-let navIdx = -1;
-$('nav').onclick = () => {
-  if (!orbs.length) return;
-  navIdx = (navIdx + 1) % orbs.length;
-  showInfo(navIdx);
-  if (navIdx === 0){ cam.focus = 0; cam.goalTarget = [0, 0.05, 0]; cam.goalDist = 3.4; }
-};
 
 $('spk').onclick = () => {
   S.voiceOut = !S.voiceOut;
@@ -1766,23 +1799,182 @@ if (window.visualViewport){
   });
 }
 
-/* ---------- Запуск: помощники почкуются ---------- */
-$('start').onclick = () => {
-  $('boot').classList.add('gone');
-  S.booted = true;
-  if (window.speechSynthesis){
-    try { const u = new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); } catch { /* ok */ }
+/* ---------- Штурвал: управление одним пальцем по дереву команд ----------
+   Прижал рукоять — веером вылетают команды; ведёшь палец (не отпуская) —
+   ветки раскрываются, орбы подсматриваются камерой; отпустил на листе —
+   исполнилось; отпустил в пустоте — всё сложилось обратно. Работает и мышью. */
+const HELM_TREE = [
+  { icon: '⦿', label: 'ОРБЫ', kids: [
+    { icon: '◉', label: 'TAIMEN',    orb: 'main' },
+    { icon: '✴', label: 'СТРАТЕГ',   orb: 'strateg' },
+    { icon: '❖', label: 'АНАЛИТИК',  orb: 'analitik' },
+    { icon: '✎', label: 'ПИСАРЬ',    orb: 'pisar' },
+    { icon: '⛬', label: 'ХРАНИТЕЛЬ', orb: 'hranitel' },
+    { icon: '◐', label: 'ШПИОН',     orb: 'shpion' },
+    { icon: '⧖', label: 'IMMORTAL',  orb: 'immortal' },
+  ] },
+  { icon: '◈', label: 'ВИД', kids: [
+    { icon: '⌂', label: 'ДОМОЙ', act: () => { hideInfo(); cam.focus = 0; cam.goalTarget = [0, 0.05, 0]; cam.goalDist = 5.4; say('sys', '⌂ домой'); } },
+    { icon: '∞', label: 'ВСЯ СИСТЕМА', act: () => { hideInfo(); cam.focus = 0; cam.goalTarget = [0, 0.05, 0]; cam.goalDist = 9.5; say('sys', '🔭 общий план'); } },
+  ] },
+  { icon: '🎙', label: 'ГОЛОС',  act: () => startListening() },
+  { icon: '✦', label: 'ЗНАНИЯ', act: () => $('know').classList.toggle('open') },
+  { icon: '🔊', label: 'ЗВУК',   act: () => $('spk').click() },
+];
+
+const helmEl = $('helm');
+let helmNodes = [];              // {el, x, y, def, depth, expanded}
+let helmHover = null, helmDwell = null, helmPrevCam = null, helmPid = null, helmT0 = 0;
+
+function helmClampXY(x, y){
+  return [ Math.min(Math.max(x, 34), innerWidth - 34), Math.min(Math.max(y, 44), innerHeight - 50) ];
+}
+function helmSpawn(def, x, y, depth, delay){
+  const el = document.createElement('div');
+  el.className = 'helmnode';
+  el.innerHTML = '<span>' + def.icon + '</span><span class="hl">' + def.label + '</span>';
+  el.style.left = x + 'px'; el.style.top = y + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add('in'), 16 + delay);
+  helmNodes.push({ el, x, y, def, depth, expanded: false });
+}
+function helmFan(defs, cx, cy, baseAng, depth){
+  const R = defs.length > 5 ? 108 : 92;
+  const gap = defs.length > 1 ? Math.min(0.62, 2.9 / (defs.length - 1)) : 0;
+  const start = baseAng - gap * (defs.length - 1) / 2;
+  const pts = defs.map((d, i) => {
+    const [x, y] = helmClampXY(cx + Math.cos(start + gap * i) * R, cy + Math.sin(start + gap * i) * R);
+    return { x, y };
+  });
+  // расталкивание: после прижатия к краю экрана узлы не липнут друг к другу,
+  // к уже висящим веткам и к рукояти
+  const [hx, hy] = helmHandleXY();
+  const fixed = helmNodes.map(n => ({ x: n.x, y: n.y })).concat([{ x: hx, y: hy }]);
+  for (let it = 0; it < 30; it++){
+    let moved = false;
+    for (let i = 0; i < pts.length; i++){
+      const others = fixed.concat(pts.filter((_, j) => j !== i));
+      for (const q of others){
+        const dx = pts[i].x - q.x, dy = pts[i].y - q.y;
+        const d = Math.hypot(dx, dy);
+        if (d < 60 && d > 0.001){
+          const push = (60 - d) / 2;
+          pts[i].x += dx / d * push; pts[i].y += dy / d * push;
+          moved = true;
+        } else if (d <= 0.001){ pts[i].x += 9; pts[i].y -= 9; moved = true; }
+      }
+      const c = helmClampXY(pts[i].x, pts[i].y);
+      pts[i].x = c[0]; pts[i].y = c[1];
+    }
+    if (!moved) break;
   }
+  defs.forEach((d, i) => helmSpawn(d, pts[i].x, pts[i].y, depth, i * 28));
+}
+function helmHandleXY(){
+  const r = helmEl.getBoundingClientRect();
+  return [r.left + r.width / 2, r.top + r.height / 2];
+}
+function helmKill(n){ n.el.classList.remove('in'); setTimeout(() => n.el.remove(), 240); }
+function helmExpand(n){
+  helmNodes = helmNodes.filter(k => { if (k.depth > n.depth){ helmKill(k); return false; } return true; });
+  helmNodes.forEach(k => k.el.classList.toggle('dim', k.depth === n.depth && k !== n));
+  const [hx, hy] = helmHandleXY();
+  helmFan(n.def.kids, n.x, n.y, Math.atan2(n.y - hy, n.x - hx), n.depth + 1);
+  n.expanded = true;
+  popSound();
+}
+function helmPreview(n){
+  const idx = n.def.orb === 'main' ? 0 : orbIdxByEnt(n.def.orb);
+  if (idx < 0) return;
+  if (!helmPrevCam) helmPrevCam = { focus: cam.focus, dist: cam.goalDist, tgt: cam.goalTarget.slice() };
+  cam.focus = idx;
+  cam.goalDist = idx === 0 ? 4.2 : Math.max(0.9, orbs[idx].rad * 6.0);
+}
+function helmUnpreview(){
+  if (!helmPrevCam) return;
+  cam.focus = helmPrevCam.focus; cam.goalDist = helmPrevCam.dist; cam.goalTarget = helmPrevCam.tgt;
+  helmPrevCam = null;
+}
+function helmNearest(x, y){
+  let best = null, bd = 52 * 52;
+  for (const n of helmNodes){
+    const dx = n.x - x, dy = n.y - y, d = dx * dx + dy * dy;
+    if (d < bd){ bd = d; best = n; }
+  }
+  return best;
+}
+function helmSetHover(n){
+  if (helmHover === n) return;
+  if (helmHover){
+    helmHover.el.classList.remove('hover');
+    if (helmHover.def.orb) helmUnpreview();
+  }
+  clearTimeout(helmDwell); helmDwell = null;
+  helmHover = n;
+  if (!n) return;
+  n.el.classList.add('hover');
+  if (n.def.kids && !n.expanded) helmDwell = setTimeout(() => helmExpand(n), 130);
+  if (n.def.orb) helmPreview(n);
+}
+function helmExec(n){
+  const d = n.def;
+  if (d.orb){
+    const idx = d.orb === 'main' ? 0 : orbIdxByEnt(d.orb);
+    if (idx < 0){ helmUnpreview(); say('sys', '✕ ' + d.label + ' ещё не родился'); }
+    else { helmPrevCam = null; showInfo(idx); say('sys', '◎ навёлся: ' + d.label); }
+  } else if (d.act){ helmUnpreview(); d.act(); }
+  popSound();
+}
+function helmClose(execute){
+  clearTimeout(helmDwell); helmDwell = null;
+  const h = helmHover;
+  if (helmHover){ helmHover.el.classList.remove('hover'); helmHover = null; }
+  helmNodes.forEach(helmKill); helmNodes = [];
+  helmEl.classList.remove('armed');
+  if (execute && h && !h.def.kids) helmExec(h);
+  else helmUnpreview();
+}
+helmEl.addEventListener('pointerdown', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  wakeUi(); sndInit();
+  helmPid = e.pointerId; helmT0 = performance.now();
+  try { helmEl.setPointerCapture(e.pointerId); } catch { /* ok */ }
+  helmEl.classList.add('armed');
+  const [hx, hy] = helmHandleXY();
+  helmFan(HELM_TREE, hx, hy, -Math.PI * 0.30, 0);
+});
+helmEl.addEventListener('pointermove', (e) => {
+  if (helmPid === null || e.pointerId !== helmPid) return;
+  helmSetHover(helmNearest(e.clientX, e.clientY));
+});
+const helmUp = (e) => {
+  if (helmPid === null || e.pointerId !== helmPid) return;
+  helmPid = null;
+  const quickTap = e.type === 'pointerup' && !helmHover && performance.now() - helmT0 < 300;
+  helmClose(e.type === 'pointerup');
+  if (quickTap && !S.helmHinted){
+    S.helmHinted = true;
+    say('sys', '⎈ штурвал: прижми и, не отпуская, веди палец по веткам; отпусти на выбранном');
+  }
+};
+helmEl.addEventListener('pointerup', helmUp);
+helmEl.addEventListener('pointercancel', helmUp);
+
+/* ---------- Жизнь начинается сама: заставка -> (новости) -> разлёт ---------- */
+let lifeStarted = false;
+function beginLife(){
+  if (lifeStarted) return;
+  lifeStarted = true;
+  S.booted = true;
   setStatus('idle');
   // взрывное почкование: вся свита разом, следом родословная; камера отъезжает,
-  // чтобы видеть всю картину; глубинный гул на рождении
-  sndInit();
-  const burst = 650;
-  setTimeout(() => { boomSound(); cam.goalDist = 7.4; }, burst);
-  ENT_ORDER.forEach((id, i) => setTimeout(() => spawnOrb(id, 0, 1), burst + i * 140));
-  setTimeout(() => { const p = orbIdxByEnt('strateg'); if (p > 0) spawnOrb('shpion', p, 2); }, burst + 950);
-  setTimeout(() => { const p = orbIdxByEnt('shpion'); if (p > 0) spawnOrb('immortal', p, 3); }, burst + 1750);
-  setTimeout(() => { if (cam.focus <= 0) cam.goalDist = 5.6; }, burst + 6500);
+  // чтобы видеть всю систему, и возвращается после разлёта
+  const burst = 500;
+  setTimeout(() => { boomSound(); cam.goalDist = 11.0; }, burst);
+  ENT_ORDER.forEach((id, i) => setTimeout(() => spawnOrb(id, 0, 1), burst + i * 240));
+  setTimeout(() => { const p = orbIdxByEnt('strateg'); if (p > 0) spawnOrb('shpion', p, 2); }, burst + 1900);
+  setTimeout(() => { const p = orbIdxByEnt('shpion'); if (p > 0) spawnOrb('immortal', p, 3); }, burst + 3400);
+  setTimeout(() => { if (cam.focus <= 0) cam.goalDist = 5.8; }, burst + 12000);
   // восстановить хвост прошлой беседы — продолжаем с того же места
   for (const m of S.history.slice(-6)){
     say(m.role === 'user' ? 'user' : 'taimen', parseTags(m.content).text);
@@ -1791,12 +1983,28 @@ $('start').onclick = () => {
     ? 'Я вынырнул. Помню, о чём мы говорили — продолжай.'
     : 'Я здесь. Смотри — свита рождается из меня. Говори вслух или пиши.';
   say('taimen', greeting);
-  speak(greeting);
-  showUpdateNews();
-};
+  speak(greeting); // без жеста браузер может промолчать — текст всё равно есть
+}
+
+// звук и синтез готовим при первом же касании (правила автоплея браузеров)
+window.addEventListener('pointerdown', function once(){
+  sndInit();
+  if (window.speechSynthesis){
+    try { const u = new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); } catch { /* ok */ }
+  }
+  window.removeEventListener('pointerdown', once);
+}, { once: true });
 
 setStatus('idle');
-loadMemory();
+loadMemory().then(() => {
+  setTimeout(() => {
+    $('boot').classList.add('gone');
+    let seen = '';
+    try { seen = localStorage.getItem('taimen-ver') || ''; } catch { /* ok */ }
+    if (seen !== APP_VERSION) showUpdateNews(beginLife); // разлёт — после закрытия новостей
+    else setTimeout(beginLife, 600);
+  }, 1600);
+});
 
 /* звук глубин: гул рождения и щелчки почкования */
 let sndCtx = null;
@@ -1840,10 +2048,10 @@ function popSound(){
 }
 
 /* новости версии: астероиды замедляются к центру, где висит «что нового» */
-function showUpdateNews(){
+function showUpdateNews(cb){
   let seen = '';
   try { seen = localStorage.getItem('taimen-ver') || ''; } catch { /* ok */ }
-  if (seen === APP_VERSION) return;
+  if (seen === APP_VERSION){ if (cb) cb(); return; }
   const ov = document.createElement('div'); ov.id = 'news';
   const card = document.createElement('div'); card.id = 'newscard'; card.className = 'glass';
   card.innerHTML = '<h2>TAIMEN ОБНОВИЛСЯ</h2><div class="ver">версия ' + APP_VERSION + ' · что нового:</div>' +
@@ -1888,6 +2096,7 @@ function showUpdateNews(){
     alive = false;
     try { localStorage.setItem('taimen-ver', APP_VERSION); } catch { /* ok */ }
     ov.remove();
+    if (cb) cb();
   };
 }
 

@@ -97,6 +97,61 @@ function ev(method, body, ip) {
   r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'x' }] }, '10.0.0.7'));
   assert.equal(r.statusCode, 503, 'нет ключа -> 503');
 
+  // запасной мозг №1 (OpenRouter): нет ключа Anthropic, есть OPENROUTER_API_KEY -> 200
+  process.env.OPENROUTER_API_KEY = 'or_test';
+  fetchCalls = [];
+  global.fetch = async (url, opts) => {
+    fetchCalls.push({ url, opts });
+    return { ok: true, status: 200, json: async () => ({
+      model: 'deepseek/deepseek-chat-v3-0324:free',
+      choices: [{ message: { content: 'Отвечаю из запаса.' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 5 } }) };
+  };
+  r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'x' }], system: 'ты рыба' }, '10.0.0.30'));
+  assert.equal(r.statusCode, 200, 'openrouter-запаска -> 200');
+  const jb = JSON.parse(r.body);
+  assert.equal(jb.text, 'Отвечаю из запаса.', 'текст от запаски');
+  assert.ok(jb.model.indexOf('openrouter/') === 0, 'модель помечена openrouter/');
+  assert.ok(fetchCalls[0].url.includes('openrouter.ai'), 'запрос ушёл в OpenRouter');
+  assert.equal(fetchCalls[0].opts.headers.authorization, 'Bearer or_test', 'ключ в заголовке');
+  const orSent = JSON.parse(fetchCalls[0].opts.body);
+  assert.equal(orSent.messages[0].role, 'system', 'system ушёл первым сообщением');
+  assert.ok(orSent.max_tokens <= 1000, 'потолок токенов запаски');
+  assert.equal(jb.budget.spent, 0, ':free — бюджет не тратится');
+
+  // основной мозг упал (529) + запаска есть -> отвечает запаска
+  process.env.ANTHROPIC_API_KEY = 'sk-test';
+  const calls2 = [];
+  global.fetch = async (url) => {
+    calls2.push(url);
+    if (url.includes('anthropic')) return { ok: false, status: 529, json: async () => ({ error: { message: 'overloaded' } }) };
+    return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'запас' } }], usage: {} }) };
+  };
+  r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'x' }] }, '10.0.0.31'));
+  assert.equal(r.statusCode, 200, '529 у Anthropic + запаска -> 200');
+  assert.equal(JSON.parse(r.body).text, 'запас', 'текст от запаски');
+  assert.equal(calls2.length, 2, 'два вызова: Anthropic, потом OpenRouter');
+  delete process.env.OPENROUTER_API_KEY;
+
+  // запасной мозг №2 (Replicate): только REPLICATE_API_TOKEN
+  delete process.env.ANTHROPIC_API_KEY;
+  process.env.REPLICATE_API_TOKEN = 'r8_test';
+  fetchCalls = [];
+  global.fetch = async (url, opts) => {
+    fetchCalls.push({ url, opts });
+    return { ok: true, status: 200, json: async () => ({
+      status: 'succeeded', output: ['Из ', 'Replicate.'],
+      metrics: { input_token_count: 10, output_token_count: 5 } }) };
+  };
+  r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'x' }] }, '10.0.0.32'));
+  assert.equal(r.statusCode, 200, 'replicate-запаска -> 200');
+  const jb2 = JSON.parse(r.body);
+  assert.equal(jb2.text, 'Из Replicate.', 'склейка output-массива');
+  assert.ok(jb2.model.indexOf('replicate/') === 0, 'модель помечена replicate/');
+  assert.ok(fetchCalls[0].url.includes('replicate.com'), 'запрос ушёл в Replicate');
+  assert.ok(JSON.parse(fetchCalls[0].opts.body).input.prompt.includes('Хозяин: x'), 'история склеена в диалог');
+  delete process.env.REPLICATE_API_TOKEN;
+
   // tts заглушка
   r = await tts.handler({});
   assert.equal(r.statusCode, 501, 'tts -> 501');
