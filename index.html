@@ -60,7 +60,8 @@
     position: fixed; z-index: 4; transform: translate(-50%, -100%);
     font-size: 10px; letter-spacing: .22em; color: var(--dim);
     text-shadow: 0 0 8px rgba(0,0,20,.9); pointer-events: auto; cursor: pointer;
-    padding: 4px 8px; transition: color .4s, text-shadow .4s; white-space: nowrap;
+    padding: 12px 16px; margin: -8px; transition: color .4s, text-shadow .4s; white-space: nowrap;
+    touch-action: manipulation;
   }
   .entlabel.suggested{ color: #ffe9b0; text-shadow: 0 0 14px rgba(255,220,140,.9); animation: lblpulse 1.6s infinite; }
   .entlabel.active{ color: #ffffff; text-shadow: 0 0 16px rgba(160,190,255,1); }
@@ -245,7 +246,7 @@
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · колесо/щипок — ближе · тап по шару — слово ему</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.5.0 · © 2026 Ex13m</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.6.0 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -273,6 +274,7 @@
     <button id="mic" class="btn" title="говорить">🎙</button>
     <input id="inp" placeholder="скажи или напиши…" autocomplete="off">
     <button id="send" class="btn" title="отправить">➤</button>
+    <button id="nav" class="btn" title="наведение: следующий орб">◎</button>
     <button id="spk" class="btn" title="голос Тайменя вкл/выкл">🔊</button>
   </div>
 </div>
@@ -298,13 +300,13 @@
    ========================================================= */
 
 const MAXO = 9;
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 const WHATS_NEW = [
-  'мы теперь TAIMEN — timing × men',
-  'маленькие 3D-ракеты летают между орбами при каждом взаимодействии',
-  'орбиты сами расходятся, если шары задевают друг друга',
-  'зум без границ: от поверхности шара до всей системы точками',
-  'из 1.4: авторазведка новостей, ночной мастер-самокод, бюджет с отсечкой +10%',
+  'взрывное рождение свиты: все разом, с глубинным гулом и отъездом камеры',
+  'скорость: простые вопросы — быстрый разум (Sonnet 5); скажи «подумай…» — глубокий (Fable 5)',
+  'наведение: голосом «покажи иммортала» / «покажи всех», кнопка ◎ листает орбы',
+  'орбиты: полные 360° с наклоном; Стратег держится ближе к дому',
+  'в малые шары легко попасть пальцем',
 ];
 
 /* ---------- Шейдеры ---------- */
@@ -766,6 +768,7 @@ function spawnOrb(entId, parentIdx, level){
   };
   orbs.push(o);
   ensureLabel(o);
+  if (S.booted) popSound();
   return o;
 }
 function orbIdxByEnt(entId){ return orbs.findIndex(o => o.entId === entId); }
@@ -872,7 +875,8 @@ function pickOrb(cx, cy){
   orbs.forEach((o, i) => {
     const oc = [ b.pos[0]-o.pos[0], b.pos[1]-o.pos[1], b.pos[2]-o.pos[2] ];
     const bq = oc[0]*rd[0] + oc[1]*rd[1] + oc[2]*rd[2];
-    const cq = oc[0]*oc[0] + oc[1]*oc[1] + oc[2]*oc[2] - o.rad*o.rad*1.2;
+    const rr = Math.max(o.rad * 1.25, 0.24); // малые шары ловим с запасом
+    const cq = oc[0]*oc[0] + oc[1]*oc[1] + oc[2]*oc[2] - rr*rr;
     const disc = bq*bq - cq;
     if (disc > 0){ const tq = -bq - Math.sqrt(disc); if (tq > 0 && tq < best){ best = tq; hit = i; } }
   });
@@ -1027,7 +1031,7 @@ function tickOrbs(t){
   orbs.forEach((o, i) => {
     if (i === 0) return;
     // почкование: набухает в родителе -> вытягивается шейкой -> отрывается со щелчком
-    const birth = Math.min((t - o.birthT) / 4.2, 1);
+    const birth = Math.min((t - o.birthT) / 2.2, 1);
     const swell = Math.min(birth / 0.5, 1);
     const pull = Math.min(Math.max((birth - 0.38) / 0.62, 0), 1);
     const bo = pull >= 1 ? 1 : 1 + 2.70158 * Math.pow(pull - 1, 3) + 1.70158 * Math.pow(pull - 1, 2); // overshoot
@@ -1039,14 +1043,19 @@ function tickOrbs(t){
     const grow = o.boost || 1; // авторасширение орбиты при тесноте
     if (o.level === 1){
       const a = o.slot * Math.PI/2 + t * 0.05;
-      slotPos = [ Math.cos(a)*2.5*grow, Math.sin(t*0.5 + o.phase)*0.14, Math.sin(a)*2.5*grow ];
+      slotPos = [ Math.cos(a)*2.4*grow, Math.sin(t*0.5 + o.phase)*0.14, Math.sin(a)*2.4*grow ];
     } else {
-      // орбита вокруг родителя: чем младше поколение, тем теснее и шустрее (как луна)
+      // полная 360°-орбита вокруг родителя в наклонённой плоскости (видно объём)
       const pp = orbs[o.parent].pos;
-      const R2 = (o.level === 3 ? 0.42 : 0.85) * grow;
-      const spd = o.level === 3 ? 0.75 : 0.4;
+      const R2 = (o.level === 3 ? 0.44 : 0.80) * grow;
+      const spd = o.level === 3 ? 0.85 : 0.42;
+      const tilt = o.level === 3 ? 0.55 : 0.32; // наклон плоскости орбиты
       const a2 = t*spd + o.phase;
-      slotPos = [ pp[0] + Math.cos(a2)*R2, pp[1] + Math.sin(t*0.8 + o.phase)*0.12, pp[2] + Math.sin(a2)*R2 ];
+      slotPos = [
+        pp[0] + Math.cos(a2)*R2,
+        pp[1] + Math.sin(a2)*R2*tilt,
+        pp[2] + Math.sin(a2)*R2*(1 - tilt*0.45),
+      ];
     }
     const pp = orbs[o.parent].pos;
     o.pos = [ lerp(pp[0], slotPos[0], eb), lerp(pp[1], slotPos[1], eb), lerp(pp[2], slotPos[2], eb) ];
@@ -1072,7 +1081,7 @@ function tickOrbs(t){
   // теснота: задевают друг друга — орбиты расходятся (родитель-дитя не считаем)
   for (let i = 1; i < orbs.length; i++){
     const oi = orbs[i];
-    if ((t - oi.birthT) < 4.2) continue;
+    if ((t - oi.birthT) < 2.2) continue;
     let crowded = false;
     for (let j = 0; j < orbs.length; j++){
       if (i === j || oi.parent === j || orbs[j].parent === i) continue;
@@ -1080,7 +1089,7 @@ function tickOrbs(t){
       const dx = oi.pos[0]-oj.pos[0], dy = oi.pos[1]-oj.pos[1], dz = oi.pos[2]-oj.pos[2];
       if (Math.hypot(dx, dy, dz) < (oi.rad + oj.rad) * 1.35){ crowded = true; break; }
     }
-    if (crowded) oi.boost = Math.min(2.4, (oi.boost || 1) + 0.012);
+    if (crowded) oi.boost = Math.min(oi.level === 1 ? 1.35 : 2.2, (oi.boost || 1) + 0.012);
     else oi.boost = (oi.boost || 1) + (1 - (oi.boost || 1)) * 0.004; // плавно домой
   }
 
@@ -1451,15 +1460,25 @@ function buildSystem(){
   }
   return sys;
 }
+/* скорость vs глубина: бытовые вопросы летят через Sonnet 5 (секунды),
+   глубокие — через Fable 5 (думает дольше, отвечает мощнее).
+   Форсировать глубину: начни сообщение со слова «подумай». */
+function pickMainModel(messages){
+  const last = String((messages[messages.length - 1] || {}).content || '');
+  const deep = last.length > 220 ||
+    /^подумай|глубок|сложн|проанализ|разложи|спланируй|стратеги|философ|смысл|прими решение/i.test(last);
+  return deep ? 'claude-fable-5' : 'claude-sonnet-5';
+}
 async function callBrain(messages, opts){
+  // иерархия разума: Таймень — Fable 5/Sonnet 5 по глубине, свита — Opus 4.8, суб-задачи — Sonnet 5
+  const model = (opts && opts.model) ||
+    (S.activeEntity ? (ENTITIES[S.activeEntity].model || 'claude-opus-4-8') : pickMainModel(messages));
   const res = await fetch('/api/chat', {
     method: 'POST', headers: apiHeaders(),
     body: JSON.stringify({
-      // иерархия разума: Таймень — Fable 5, свита — Opus 4.8, суб-задачи — Sonnet 5
       messages, system: (opts && opts.system) || buildSystem(),
-      model: (opts && opts.model) ||
-        (S.activeEntity ? (ENTITIES[S.activeEntity].model || 'claude-opus-4-8') : 'claude-fable-5'),
-      max_tokens: (opts && opts.max_tokens) || (S.activeEntity ? 900 : 1600),
+      model,
+      max_tokens: (opts && opts.max_tokens) || (S.activeEntity ? 900 : (model === 'claude-fable-5' ? 1600 : 700)),
     }),
   });
   const j = await res.json().catch(() => ({}));
@@ -1496,6 +1515,29 @@ let busy = false;
 async function sendMessage(text){
   text = (text || '').trim();
   if (!text || busy) return;
+  // наведение: «покажи иммортала», «приблизь шпиона», «покажи всех»
+  const nav = text.match(/^(покажи|наведись на|приблизь|открой)\s+(.+)$/i);
+  if (nav){
+    const q = nav[2].toLowerCase();
+    const MAPN = { 'иммортал': 'immortal', 'шпион': 'shpion', 'стратег': 'strateg',
+      'аналитик': 'analitik', 'писар': 'pisar', 'хранител': 'hranitel', 'таймен': 'main' };
+    let done = false;
+    if (/^(всех|все|систему|общий план|карту)/.test(q)){
+      hideInfo(); cam.focus = 0; cam.goalTarget = [0, 0.05, 0]; cam.goalDist = 9.5;
+      say('sys', '🔭 общий план'); done = true;
+    } else {
+      for (const k of Object.keys(MAPN)){
+        if (q.startsWith(k)){
+          const idx = MAPN[k] === 'main' ? 0 : orbIdxByEnt(MAPN[k]);
+          if (idx < 0){ say('sys', '✕ ' + nav[2] + ' ещё не родился'); }
+          else { showInfo(idx); if (idx === 0){ cam.focus = 0; cam.goalTarget = [0, 0.05, 0]; cam.goalDist = 3.4; } say('sys', '◎ навёлся: ' + (idx === 0 ? 'TAIMEN' : ENTITIES[MAPN[k]].name)); }
+          done = true; break;
+        }
+      }
+    }
+    if (done) return;
+  }
+
   // ввод пароля прямо в чате: «пароль моёслово»
   const pw = text.match(/^пароль[\s:]+(.+)$/i);
   if (pw){
@@ -1694,6 +1736,15 @@ function speak(text){
     speechSynthesis.speak(u);
   } catch { setStatus('idle'); }
 }
+/* компас: тапами листаем орбы по кругу (или голосом: «покажи иммортала») */
+let navIdx = -1;
+$('nav').onclick = () => {
+  if (!orbs.length) return;
+  navIdx = (navIdx + 1) % orbs.length;
+  showInfo(navIdx);
+  if (navIdx === 0){ cam.focus = 0; cam.goalTarget = [0, 0.05, 0]; cam.goalDist = 3.4; }
+};
+
 $('spk').onclick = () => {
   S.voiceOut = !S.voiceOut;
   $('spk').classList.toggle('on', S.voiceOut);
@@ -1723,10 +1774,15 @@ $('start').onclick = () => {
     try { const u = new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); } catch { /* ok */ }
   }
   setStatus('idle');
-  // почкование свиты — по одному; затем родословная Шпиона и Иммортала
-  ENT_ORDER.forEach((id, i) => setTimeout(() => spawnOrb(id, 0, 1), 800 + i * 2300));
-  setTimeout(() => { const p = orbIdxByEnt('strateg'); if (p > 0) spawnOrb('shpion', p, 2); }, 800 + 4 * 2300);
-  setTimeout(() => { const p = orbIdxByEnt('shpion'); if (p > 0) spawnOrb('immortal', p, 3); }, 800 + 4 * 2300 + 3200);
+  // взрывное почкование: вся свита разом, следом родословная; камера отъезжает,
+  // чтобы видеть всю картину; глубинный гул на рождении
+  sndInit();
+  const burst = 650;
+  setTimeout(() => { boomSound(); cam.goalDist = 7.4; }, burst);
+  ENT_ORDER.forEach((id, i) => setTimeout(() => spawnOrb(id, 0, 1), burst + i * 140));
+  setTimeout(() => { const p = orbIdxByEnt('strateg'); if (p > 0) spawnOrb('shpion', p, 2); }, burst + 950);
+  setTimeout(() => { const p = orbIdxByEnt('shpion'); if (p > 0) spawnOrb('immortal', p, 3); }, burst + 1750);
+  setTimeout(() => { if (cam.focus <= 0) cam.goalDist = 5.6; }, burst + 6500);
   // восстановить хвост прошлой беседы — продолжаем с того же места
   for (const m of S.history.slice(-6)){
     say(m.role === 'user' ? 'user' : 'taimen', parseTags(m.content).text);
@@ -1741,6 +1797,47 @@ $('start').onclick = () => {
 
 setStatus('idle');
 loadMemory();
+
+/* звук глубин: гул рождения и щелчки почкования */
+let sndCtx = null;
+function sndInit(){
+  try {
+    sndCtx = sndCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (sndCtx.state === 'suspended') sndCtx.resume();
+  } catch { /* без звука */ }
+}
+function boomSound(){
+  if (!sndCtx) return;
+  try {
+    const dur = 1.6, sr = sndCtx.sampleRate;
+    const buf = sndCtx.createBuffer(1, sr * dur, sr), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2.2);
+    const src = sndCtx.createBufferSource(); src.buffer = buf;
+    const f = sndCtx.createBiquadFilter(); f.type = 'lowpass';
+    f.frequency.setValueAtTime(340, sndCtx.currentTime);
+    f.frequency.exponentialRampToValueAtTime(45, sndCtx.currentTime + dur);
+    const g = sndCtx.createGain();
+    g.gain.setValueAtTime(0.55, sndCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, sndCtx.currentTime + dur);
+    src.connect(f); f.connect(g); g.connect(sndCtx.destination); src.start();
+  } catch { /* ok */ }
+}
+function popSound(){
+  if (!sndCtx) return;
+  try {
+    const dur = 0.22, sr = sndCtx.sampleRate;
+    const buf = sndCtx.createBuffer(1, sr * dur, sr), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+    const src = sndCtx.createBufferSource(); src.buffer = buf;
+    const f = sndCtx.createBiquadFilter(); f.type = 'bandpass';
+    f.frequency.setValueAtTime(700, sndCtx.currentTime);
+    f.frequency.exponentialRampToValueAtTime(180, sndCtx.currentTime + dur);
+    const g = sndCtx.createGain();
+    g.gain.setValueAtTime(0.22, sndCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, sndCtx.currentTime + dur);
+    src.connect(f); f.connect(g); g.connect(sndCtx.destination); src.start();
+  } catch { /* ok */ }
+}
 
 /* новости версии: астероиды замедляются к центру, где висит «что нового» */
 function showUpdateNews(){
