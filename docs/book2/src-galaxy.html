@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>TAIMEN — Книга галактики</title>
+<style>
+  @page{ size: A4; margin: 0; }
+  *{ margin: 0; padding: 0; box-sizing: border-box; }
+  :root{
+    --ink:#e4ecff; --dim:#8595c4; --cy:#6ea8ff; --gr:#6fdc4f; --vi:#b98cff; --am:#ffc24d; --warn:#ff6a5e;
+    --line:rgba(120,160,255,.22); --glass:rgba(16,24,56,.5);
+  }
+  body{ font-family:'DejaVu Sans',sans-serif; color:var(--ink); }
+  .page{ width:210mm; height:296mm; page-break-after:always; position:relative; overflow:hidden;
+    background:radial-gradient(130% 90% at 60% -10%, #14224f 0%, #0a1130 42%, #04070f 100%); padding:15mm; }
+  .stars::before{ content:''; position:absolute; inset:0; pointer-events:none;
+    background:
+      radial-gradient(1px 1px at 12% 22%, rgba(255,255,255,.6) 50%, transparent 51%),
+      radial-gradient(1.4px 1.4px at 68% 14%, rgba(180,210,255,.5) 50%, transparent 51%),
+      radial-gradient(1px 1px at 82% 42%, rgba(160,255,150,.45) 50%, transparent 51%),
+      radial-gradient(1px 1px at 40% 70%, rgba(255,255,255,.4) 50%, transparent 51%),
+      radial-gradient(1.6px 1.6px at 24% 84%, rgba(200,180,255,.5) 50%, transparent 51%),
+      radial-gradient(1px 1px at 92% 78%, rgba(255,255,255,.35) 50%, transparent 51%); }
+  h1{ font-size:36pt; letter-spacing:.32em; font-weight:700; text-shadow:0 0 26px rgba(110,168,255,.9); }
+  h2{ font-size:15pt; letter-spacing:.24em; color:#eef4ff; margin-bottom:5mm; text-shadow:0 0 16px rgba(110,168,255,.8); }
+  h2 .n{ color:var(--gr); }
+  h3{ font-size:10.5pt; letter-spacing:.1em; color:#cfe0ff; margin:3mm 0 1.5mm; }
+  p,li{ font-size:9pt; line-height:1.5; }
+  .dim{ color:var(--dim); }
+  .card{ background:var(--glass); border:1px solid var(--line); border-radius:4mm; padding:4mm 5mm; margin-bottom:3.5mm;
+    backdrop-filter:blur(2px); }
+  .foot{ position:absolute; bottom:8mm; left:15mm; right:15mm; display:flex; justify-content:space-between;
+    font-size:7pt; letter-spacing:.2em; color:var(--dim); border-top:1px solid var(--line); padding-top:2.5mm; }
+  ul{ list-style:none; } ul li{ padding-left:4mm; position:relative; margin-bottom:1.4mm; }
+  ul li::before{ content:'◆'; position:absolute; left:0; color:var(--cy); font-size:6pt; top:1mm; }
+  table{ width:100%; border-collapse:collapse; font-size:8.5pt; }
+  td,th{ padding:2mm 2.5mm; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  th{ color:var(--dim); letter-spacing:.12em; font-size:7.5pt; font-weight:400; }
+  .tag{ display:inline-block; font-size:7pt; letter-spacing:.12em; padding:.6mm 2.2mm; border-radius:2mm;
+    border:1px solid var(--line); color:var(--dim); }
+  .two{ display:flex; gap:5mm; } .two>div{ flex:1; }
+  /* фото наблюдателя */
+  .obs{ border-radius:3mm; border:1px solid rgba(111,220,79,.4); box-shadow:0 0 10mm rgba(111,220,79,.25); }
+  .obsframe{ position:relative; border-radius:50%; overflow:hidden; border:1mm solid rgba(111,220,79,.5);
+    box-shadow:0 0 12mm rgba(111,220,79,.3), inset 0 0 8mm rgba(0,0,20,.6); }
+  .obsframe img{ width:100%; height:100%; object-fit:cover; }
+</style>
+</head>
+<body>
+
+<!-- ОБЛОЖКА: Наблюдатель над галактикой -->
+<div class="page stars" style="display:flex; flex-direction:column; align-items:center; text-align:center;">
+  <!-- галактика -->
+  <svg style="position:absolute; top:0; left:0;" width="210mm" height="296mm" viewBox="0 0 794 1123" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <radialGradient id="core" cx="50%" cy="50%"><stop offset="0%" stop-color="#eaf2ff"/><stop offset="30%" stop-color="#8fb0ff"/><stop offset="70%" stop-color="#3a4fb0" stop-opacity=".5"/><stop offset="100%" stop-color="#0a1130" stop-opacity="0"/></radialGradient>
+      <radialGradient id="pl-vi" cx="35%" cy="30%"><stop offset="0%" stop-color="#e0c8ff"/><stop offset="55%" stop-color="#7a3adf"/><stop offset="100%" stop-color="#1a1040"/></radialGradient>
+      <radialGradient id="pl-cy" cx="35%" cy="30%"><stop offset="0%" stop-color="#b8f0f7"/><stop offset="55%" stop-color="#2a8fa3"/><stop offset="100%" stop-color="#0a2030"/></radialGradient>
+      <radialGradient id="pl-gr" cx="35%" cy="30%"><stop offset="0%" stop-color="#c8f7b0"/><stop offset="55%" stop-color="#4da32f"/><stop offset="100%" stop-color="#0e2a10"/></radialGradient>
+      <radialGradient id="pl-am" cx="35%" cy="30%"><stop offset="0%" stop-color="#ffe9b8"/><stop offset="55%" stop-color="#df8a3a"/><stop offset="100%" stop-color="#40200a"/></radialGradient>
+    </defs>
+    <g transform="translate(397 340)">
+      <ellipse rx="330" ry="120" fill="url(#core)" opacity=".5" transform="rotate(-18)"/>
+      <g stroke="rgba(130,170,255,.16)" fill="none">
+        <ellipse rx="150" ry="55" transform="rotate(-18)"/>
+        <ellipse rx="250" ry="92" transform="rotate(-18)"/>
+        <ellipse rx="330" ry="120" transform="rotate(-18)"/>
+      </g>
+      <circle r="30" fill="url(#core)"/>
+      <circle cx="-150" cy="30" r="20" fill="url(#pl-vi)"/>
+      <circle cx="210" cy="-40" r="17" fill="url(#pl-cy)"/>
+      <circle cx="120" cy="70" r="15" fill="url(#pl-gr)"/>
+      <circle cx="-235" cy="-30" r="13" fill="url(#pl-am)"/>
+      <circle cx="285" cy="55" r="9" fill="url(#pl-cy)"/>
+    </g>
+  </svg>
+  <!-- заголовок -->
+  <div style="position:relative; margin-top:10mm;">
+    <h1>TAIMEN</h1>
+    <div style="font-size:11pt; letter-spacing:.44em; color:var(--dim); margin-top:3mm;">ГАЛАКТИКА · timing × men</div>
+    <div style="font-size:9pt; letter-spacing:.3em; color:var(--gr); margin-top:8mm; text-shadow:0 0 12px rgba(111,220,79,.8);">САМОСОБИРАЮЩАЯ ЦИВИЛИЗАЦИЯ-ОС</div>
+  </div>
+  <!-- наблюдатель на переднем плане -->
+  <div style="position:absolute; bottom:0; left:0; right:0; height:158mm; display:flex; align-items:flex-end; justify-content:center;">
+    <!-- светящаяся площадка наблюдателя -->
+    <div style="position:absolute; bottom:20mm; left:50%; transform:translateX(-50%); width:120mm; height:24mm;
+      background:radial-gradient(ellipse at center, rgba(111,220,79,.32), rgba(110,168,255,.12) 45%, transparent 72%); border-radius:50%;"></div>
+    <img src="observer.jpg" style="position:relative; height:138mm; filter:contrast(1.06) saturate(1.08);
+      -webkit-mask-image:radial-gradient(ellipse 40% 52% at 50% 44%, #000 55%, transparent 90%);
+      mask-image:radial-gradient(ellipse 40% 52% at 50% 44%, #000 55%, transparent 90%);">
+    <div style="position:absolute; bottom:0; left:0; right:0; height:158mm; background:linear-gradient(to top, #04070f 6%, rgba(4,7,15,.35) 34%, transparent 62%); pointer-events:none;"></div>
+  </div>
+  <div style="position:absolute; bottom:26mm; left:0; right:0; text-align:center; z-index:3;">
+    <div style="font-size:10pt; letter-spacing:.3em; color:#cfe0ff;">НАБЛЮДАТЕЛЬ · EX13M</div>
+    <div class="dim" style="font-size:8pt; letter-spacing:.24em; margin-top:1.5mm;">смотрит, как растут его планеты</div>
+  </div>
+  <div class="foot" style="z-index:3;"><span>КНИГА ГАЛАКТИКИ · ВЫПУСК 1</span><span>© 2026 Ex13m</span></div>
+</div>
+
+<!-- СМЕНА ПАРАДИГМЫ -->
+<div class="page stars">
+  <h2><span class="n">01</span> · СМЕНА ПАРАДИГМЫ — АГЕНТ ЕСТЬ ПЛАНЕТА</h2>
+  <div class="card">
+    <p style="font-size:10.5pt; line-height:1.6;">TAIMEN больше не «орб со свитой». Это <b>живая галактика — твоя операционная
+    система</b>. Каждый агент — <b>планета с цивилизацией</b>, которая решает
+    поставленную задачу силами своего населения. Галактика растёт сама, осваивает
+    новые планеты, развивается как цивилизация — и одновременно это игра, где
+    <b>рост цивилизации = решённые реальные задачи</b>.</p>
+  </div>
+  <table>
+    <tr><th>БЫЛО · свита</th><th>СТАЛО · галактика</th></tr>
+    <tr><td>орб-помощник</td><td>планета с цивилизацией</td></tr>
+    <tr><td>активировать агента</td><td>прилететь на планету, спуститься к населению</td></tr>
+    <tr><td>агент отвечает</td><td>цивилизация планеты решает задачу жителями</td></tr>
+    <tr><td>новый субагент</td><td>колонизация: осваивается новая планета</td></tr>
+    <tr><td>память орба</td><td>летопись цивилизации планеты</td></tr>
+    <tr><td>расход токенов</td><td>ресурс (энергия/масса) на труд планеты</td></tr>
+    <tr><td>ночной мастер</td><td>терраформирование: галактика перестраивает себя</td></tr>
+    <tr><td>хозяин</td><td><b style="color:#b8f0a6">Наблюдатель</b> — ты, над галактикой и внутри неё</td></tr>
+  </table>
+  <div class="card" style="margin-top:4mm; border-color:rgba(110,168,255,.35);">
+    <h3>МАССА ГАЛАКТИКИ — ПРОГРЕСС СТАНОВИТСЯ ВИДИМЫМ</h3>
+    <p>В центре — <b>ядро-сингулярность «Таймень»</b>. Её вес = накопленная память
+    + решённые задачи + прожитые дни. Тяжелее ядро → шире и стабильнее орбиты
+    планет, ярче пульс, больше звёзд-достижений на фоне. Поработали — галактика
+    <b>физически стала массивнее и красивее</b>. Польза и игра — одно действие.</p>
+  </div>
+  <div class="foot"><span>01 · ПАРАДИГМА</span><span>docs/STRATEGY-GALAXY.md</span></div>
+</div>
+
+<!-- ТРИ МАСШТАБА НАБЛЮДЕНИЯ (фото на разных страницах) -->
+<div class="page stars">
+  <h2><span class="n">02</span> · ТРИ МАСШТАБА — КАК ТЫ СМОТРИШЬ</h2>
+  <div class="two" style="margin-bottom:4mm;">
+    <div class="card" style="text-align:center;">
+      <div class="obsframe" style="width:46mm; height:46mm; margin:0 auto 3mm;"><img src="observer.jpg" style="object-position:50% 8%;"></div>
+      <h3 style="text-align:center;">ГАЛАКТИКА СВЕРХУ</h3>
+      <p class="dim">Карта колоний: кто чем занят, потоки ресурсов, «посольства»
+      (ракеты обмена данными между планетами).</p>
+    </div>
+    <div class="card" style="text-align:center;">
+      <svg width="46mm" height="46mm" viewBox="0 0 120 120" style="margin:0 auto 3mm; display:block;">
+        <ellipse cx="60" cy="60" rx="52" ry="20" fill="none" stroke="rgba(120,160,255,.3)"/>
+        <ellipse cx="60" cy="60" rx="34" ry="13" fill="none" stroke="rgba(120,160,255,.2)"/>
+        <circle cx="60" cy="60" r="26" fill="url(#pl-vi)"/>
+        <circle cx="112" cy="60" r="6" fill="url(#pl-cy)"/>
+        <circle cx="88" cy="72" r="4" fill="url(#pl-gr)"/>
+      </svg>
+      <h3 style="text-align:center;">РЯДОМ С ПЛАНЕТОЙ</h3>
+      <p class="dim">Орбита, техно-кольца, спутники-подзадачи. Видно, как планета
+      устроена и что вращается вокруг неё.</p>
+    </div>
+  </div>
+  <div class="card" style="display:flex; gap:6mm; align-items:center;">
+    <img class="obs" src="observer.jpg" style="height:74mm; -webkit-mask-image:linear-gradient(to right,#000 60%,transparent 100%); mask-image:linear-gradient(to right,#000 60%,transparent 100%);">
+    <div>
+      <h3>ВБЛИЗИ · НА ПОВЕРХНОСТИ</h3>
+      <p>Ты спускаешься к самому населению. Огни городов = активные вычисления,
+      стройка = идёт работа, движение = цивилизация <b>прямо сейчас решает задачу
+      агента</b>. Не «ответ модели» — а жизнь планеты, занятой твоим делом.</p>
+      <p class="dim" style="margin-top:3mm;">Наблюдатель сидит рядом и смотрит, как
+      его цивилизация трудится над поставленной задачей.</p>
+    </div>
+  </div>
+  <div class="foot"><span>02 · МАСШТАБЫ</span><span>режимы камеры: сверху / рядом / поверхность</span></div>
+</div>
+
+<!-- ПЛАНЕТЫ ПО НАЗНАЧЕНИЮ -->
+<div class="page stars">
+  <h2><span class="n">03</span> · ПЛАНЕТЫ — ТЕХНО-БИОМ ПО НАЗНАЧЕНИЮ</h2>
+  <table>
+    <tr><th>ПЛАНЕТА</th><th>ЦИВИЛИЗАЦИЯ</th><th>ТЕХНО-БИОМ</th><th>СПЕЦЭФФЕКТ</th></tr>
+    <tr><td><b>ТАЙМЕНЬ</b><br><span class="dim">ядро</span></td><td>хранители глубин</td><td>сингулярность, аккреционные кольца</td><td>линзирование фона</td></tr>
+    <tr><td><b>СТРАТЕГ</b></td><td>архитекторы</td><td>кристалло-города, сетка маршрутов</td><td>линии-стратегемы чертятся</td></tr>
+    <tr><td><b>АНАЛИТИК</b></td><td>счётные рои</td><td>дата-океаны</td><td>столбцы данных сквозь атмосферу</td></tr>
+    <tr><td><b>ПИСАРЬ</b></td><td>сказители</td><td>янтарные библиотеки-башни</td><td>текстовые руны всплывают</td></tr>
+    <tr><td><b>ХРАНИТЕЛЬ</b></td><td>архивисты</td><td>ледяные соты-хранилища</td><td>кристаллизация граней памяти</td></tr>
+    <tr><td><b>ШПИОН</b></td><td>разведфлот</td><td>город-невидимка, шпили</td><td>сканирующий луч-развёртка</td></tr>
+    <tr><td><b>IMMORTAL</b></td><td>вечноживущие</td><td>биокупола, часы-реакторы</td><td>обратный отсчёт в облаках</td></tr>
+  </table>
+  <div class="card" style="margin-top:4mm;">
+    <h3>КОЛОНИЗАЦИЯ ПО ПОТРЕБНОСТИ</h3>
+    <p>Возник новый класс задач («рисуй», «собери PDF») — галактика <b>осваивает
+    новую планету</b> с собственным биомом. Так рождается <b>планета-Мастерская</b>:
+    принимает любые файлы, а выдаёт готовую продукцию (PDF с картинками, документы).
+    Эта книга — первая продукция такой планеты.</p>
+  </div>
+  <div class="foot"><span>03 · ПЛАНЕТЫ</span><span>стилизация графики под назначение</span></div>
+</div>
+
+<!-- ЧЕСТНАЯ 3D-ГРАФИКА -->
+<div class="page stars">
+  <h2><span class="n">04</span> · ЧЕСТНАЯ 3D-ГРАФИКА — ТРИ СТУПЕНИ</h2>
+  <div class="card" style="padding:0; overflow:hidden;">
+    <img src="planets.png" style="width:100%; display:block;">
+    <div style="padding:2.5mm 4mm;"><p class="dim" style="font-size:8pt;">Ступень A уже в коде: поверхность планет реально
+    выдавливается техно-сеткой широт/долгот — живое 3D-дрожание <b>линиями</b>,
+    а не плоская заливка. У каждого биома свой рисунок сетки.</p></div>
+  </div>
+  <div class="two">
+    <div class="card">
+      <span class="tag" style="color:#b8f0a6; border-color:rgba(111,220,79,.5);">A · ГОТОВО</span>
+      <h3>ЖИВОЙ ШЕЙДЕР</h3>
+      <p>Смещение поверхности: техно-линии дышат и деформируют силуэт; рельеф из
+      шума гонит рябь (не цвет — реальная геометрия SDF + нормаль). Светящаяся
+      сетка + сканирующая волна.</p>
+    </div>
+    <div class="card">
+      <span class="tag" style="color:#ffe0a6; border-color:rgba(255,194,77,.5);">B · СЛЕДОМ</span>
+      <h3>ЭФФЕКТЫ ВСЕЛЕННОЙ</h3>
+      <p>Атмосферный обод-небо, кольца, спутники-подзадачи, аккреционный диск ядра,
+      звёздная пыль с параллаксом, «посольские» ракеты с подписью (уже есть).</p>
+    </div>
+  </div>
+  <div class="card">
+    <span class="tag" style="color:#8fb8ff; border-color:rgba(110,168,255,.5);">C · КОГДА ПОЕДЕТ ХУДОЖНИК</span>
+    <h3>РЕАЛЬНЫЕ 3D-МЕШИ ПЛАНЕТ</h3>
+    <p>Image-to-3D (Tripo / Higgsfield generate_3d / SAM-3D): по сгенерированной
+    картинке планеты получаем настоящий GLB-меш с текстурой и грузим в сцену.
+    Тогда планета — не метабол, а реальная модель с городами. Нужен генератор
+    картинок без сетевых блоков + загрузчик GLB. <span class="dim">Сеть этой
+    сессии блокирует загрузку в Higgsfield — делаем через свой канал (Replicate).</span></p>
+  </div>
+  <div class="foot"><span>04 · ГРАФИКА</span><span>ступень A — в этой версии</span></div>
+</div>
+
+<!-- СТРАТЕГИЯ АГЕНТОВ + ИГРА -->
+<div class="page stars">
+  <h2><span class="n">05</span> · ДИПЛОМАТИЯ ПЛАНЕТ И ИГРА</h2>
+  <div class="two">
+    <div>
+      <div class="card">
+        <h3>УМНАЯ СТРАТЕГИЯ АГЕНТОВ</h3>
+        <ul>
+          <li><b>Юрисдикция.</b> Задача → ядро решает, чья планета, шлёт посольство (ракета) к нужной</li>
+          <li><b>Кооперация.</b> Сложная задача дробится: Стратег→шаги, Аналитик→счёт, Писарь→текст, Хранитель→итог — цепочка ракет в реальном времени</li>
+          <li><b>Автономная жизнь.</b> Между задачами планеты живут: Шпион шлёт разведку, Иммортал крутит отсчёт, ядро копит массу</li>
+          <li><b>Экономика.</b> Токены = масса; дорогая работа ярче горит; перерасход 110% → планета «на восстановление»</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="border-color:rgba(111,220,79,.35);">
+        <h3>ИГРОВОЙ СЛОЙ</h3>
+        <ul>
+          <li><b>Цель = рост цивилизации</b>, инструмент роста = решённые реальные задачи</li>
+          <li>Прогресс виден: масса ядра, число колоний, «эры» (мажорные версии = смена эпохи)</li>
+          <li>Достижения-звёзды на фоне за решённое</li>
+          <li><b>Голосом:</b> «покажи Аналитика» = облёт; «обновись/освой новое» = колонизация; после кода — «эра сменилась, нырнуть в новую галактику?»</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>ПОРЯДОК ДЕЙСТВИЙ (сшивка с инженерной SPEC)</h3>
+    <table style="font-size:8pt;">
+      <tr><td style="width:16mm;"><b>сейчас</b></td><td>живой шейдер (A) · этот документ · книга галактики · метафора в текстах (имена планет пока прежние)</td></tr>
+      <tr><td><b>этап 0</b></td><td>предохранители: смоук в CI, обязательный пароль, санитайзинг пожеланий</td></tr>
+      <tr><td><b>этап 1</b></td><td>память-крепость → «летопись цивилизации» (прогресс/масса не пропадают)</td></tr>
+      <tr><td><b>этап 5</b></td><td>планета-Мастерская + художник → ступень C (реальные 3D-меши)</td></tr>
+      <tr><td><b>крупный PR</b></td><td>полный ребрендинг в планеты (имена, UI, режимы камеры) — под смоук-CI</td></tr>
+    </table>
+  </div>
+  <div class="card" style="text-align:center; border-color:rgba(111,220,79,.4);">
+    <p style="font-size:10pt; letter-spacing:.18em; color:#b8f0a6;">ГАЛАКТИКА РАСТЁТ ДАЛЬШЕ</p>
+    <p class="dim" style="font-size:8pt; margin-top:1.5mm;">полная стратегия: docs/STRATEGY-GALAXY.md · инженерные этапы: docs/SPEC-2.0.md · аудит: docs/AUDIT-2026-07-14.md</p>
+  </div>
+  <div class="foot"><span>05 · ДИПЛОМАТИЯ И ИГРА</span><span>© 2026 Ex13m · составил Таймень</span></div>
+</div>
+
+</body>
+</html>
