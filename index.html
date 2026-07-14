@@ -191,9 +191,11 @@
   /* инфо-экран орба (двойной тап) */
   #infocard{
     position: fixed; right: calc(16px + env(safe-area-inset-right)); top: 50%;
-    transform: translateY(-50%); width: min(280px, calc(100vw - 32px));
+    transform: translateY(-50%); width: min(300px, calc(100vw - 32px));
+    max-height: calc(100vh - 40px); overflow-y: auto; overscroll-behavior: contain;
+    scrollbar-width: thin; scrollbar-color: rgba(110,168,255,.3) transparent;
     z-index: 9; padding: 14px 16px; display: none;
-    background: rgba(8, 12, 32, .5);
+    background: rgba(8, 12, 32, .55);
   }
   #infocard.show{ display: block; }
   #infocard h2{ font-size: 14px; letter-spacing: .3em; color: #e6efff; font-weight: 600;
@@ -205,7 +207,17 @@
   #infocard .skills span{ display: inline-block; margin: 2px 4px 2px 0; padding: 2px 8px;
     border: 1px solid rgba(110,168,255,.3); border-radius: 20px; font-size: 11px; color: #bcd2ff; }
   @media (max-width: 700px){
-    #infocard{ top: auto; transform: none; bottom: calc(30vh + 70px); right: 12px; }
+    /* на телефоне — нижний лист на всю ширину, со своей прокруткой */
+    #infocard{
+      top: auto; transform: none;
+      left: calc(10px + env(safe-area-inset-left));
+      right: calc(10px + env(safe-area-inset-right));
+      bottom: calc(10px + env(safe-area-inset-bottom));
+      width: auto; max-height: 64vh; z-index: 12;
+    }
+    #infocard h2{ position: sticky; top: -14px; padding: 14px 0 6px;
+      background: rgba(8,12,32,.92); margin: -14px 0 0; }
+    #infocard h2 .ix{ padding: 6px 10px; font-size: 16px; }
   }
 
   /* новости версии: астероиды, замедляющиеся к центру */
