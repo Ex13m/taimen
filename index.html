@@ -259,6 +259,24 @@
   .helmnode.dim{ opacity: .35; }
   .helmnode.dim.hover{ opacity: 1; }
 
+  /* ручное регулирование орбиты: табло при долгом тапе по орбу */
+  #orbtune{ position: fixed; left: 50%; top: 16%; transform: translateX(-50%) scale(.92);
+    z-index: 13; padding: 12px 18px 14px; text-align: center; pointer-events: none;
+    opacity: 0; transition: opacity .25s, transform .25s; }
+  #orbtune.show{ opacity: 1; transform: translateX(-50%) scale(1); }
+  #orbtune #ot-t{ font-size: 12px; letter-spacing: .24em; color: #dfe9ff;
+    text-shadow: 0 0 14px rgba(110,168,255,.85); white-space: nowrap; }
+  #orbtune .bar{ position: relative; width: 190px; height: 3px; margin: 10px auto 8px;
+    border-radius: 2px; background: rgba(120,160,255,.22); }
+  #orbtune .bar::after{ content: ''; position: absolute; left: 21.95%; top: -3px;
+    width: 1px; height: 9px; background: rgba(160,200,255,.5); } /* засечка ×1.0 */
+  #orbtune #ot-m{ position: absolute; top: 50%; width: 11px; height: 11px; margin-left: -5px;
+    border-radius: 50%; transform: translateY(-50%);
+    background: radial-gradient(circle at 35% 30%, #cfe0ff, #6ea8ff 65%);
+    box-shadow: 0 0 12px rgba(140,190,255,.95); transition: left .05s linear; }
+  #orbtune #ot-hint{ font-size: 9px; letter-spacing: .14em; color: var(--dim); }
+  .entlabel.grabbed{ color: #fff; text-shadow: 0 0 16px rgba(140,190,255,1); }
+
   /* новости версии: астероиды, замедляющиеся к центру */
   #news{ position: fixed; inset: 0; z-index: 24; background: rgba(3,2,16,.45);
     display: flex; align-items: center; justify-content: center; }
@@ -283,8 +301,8 @@
   <h1>TAIMEN</h1>
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
-  <div id="camhint">тяни — облёт · колесо/щипок — ближе · тап по шару — слово ему</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.7.0 · © 2026 Ex13m</div>
+  <div id="camhint">тяни — облёт · щипок — ближе · тап по шару — слово ему · долгий тап — его орбита в руках</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.8.0 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -325,6 +343,7 @@
 <div id="hearing"></div>
 <div id="gauge"></div>
 <div id="helm" title="штурвал: прижми и веди"></div>
+<div id="orbtune" class="glass"><div id="ot-t">ОРБИТА</div><div class="bar"><i id="ot-m"></i></div><div id="ot-hint">тяни ↑ шире · ↓ уже · отпусти — запомню</div></div>
 <div id="infocard" class="glass"></div>
 
 <script>
@@ -337,13 +356,12 @@
    ========================================================= */
 
 const MAXO = 9;
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.8.0';
 const WHATS_NEW = [
-  '⎈ штурвал (светящаяся рукоять слева): прижми и, не отпуская, веди палец по дереву команд — орбы, вид, голос, знания, звук; камера подсматривает то, что под пальцем',
-  'жизнь начинается сама: без кнопки — заставка, новости, взрывное почкование',
+  '⟳ орбиты в твоих руках: долгий тап по орбу — держи и тяни вверх (шире) или вниз (уже); отпустил — запомнил навсегда, переживает перезапуск',
+  'звук разделения стал живым: тягучее скрипучее натяжение, мокрый разрыв, капля и брызги — в момент отрыва почки',
+  '⎈ штурвал (рукоять слева): прижми и веди палец по дереву команд — орбы, вид, голос, знания, звук',
   'запасной мозг: при недоступном Anthropic отвечают бесплатные модели OpenRouter (или Replicate)',
-  'звук рождения: глубинный гул разлёта и щелчки отрыва',
-  'камера больше не ныряет внутрь шара; кнопки не убегают за край экрана',
 ];
 
 /* ---------- Шейдеры ---------- */
@@ -607,6 +625,7 @@ const S = {
   // база проекта IMMORTAL: базовая оценка LEV ~2045, статьи сдвигают отсчёт
   immortal: { baseTs: Date.UTC(2045, 0, 1), shiftMs: 0, analyses: [] },
   wishes: [],                                            // книга пожеланий для ночного мастера
+  orbits: {},                                            // ручная настройка орбит: entId -> множитель
   serverBudget: null,
 };
 function immortalTarget(){ return S.immortal.baseTs + S.immortal.shiftMs; }
@@ -805,10 +824,11 @@ function spawnOrb(entId, parentIdx, level){
     style: mkStyle(), seed: 1.3 + orbs.length * 2.17,
     sigil: e.sigil, sigVis: 0, palA: e.pal[0], palB: e.pal[1],
     phase: Math.random() * 6.28, boost: 1,
+    userOrbit: (S.orbits && S.orbits[entId]) || 1, // ручная настройка орбиты — переживает перезапуск
   };
   orbs.push(o);
   ensureLabel(o);
-  if (S.booted) popSound();
+  if (S.booted) setTimeout(tearSound, 1800); // тягучка рвётся, когда шейка визуально лопается
   return o;
 }
 function orbIdxByEnt(entId){ return orbs.findIndex(o => o.entId === entId); }
@@ -842,14 +862,57 @@ function camBasis(){
 /* ввод: облёт с инерцией, зум, тап, двойной тап — домой */
 let dragging = false, moved = 0, px = 0, py = 0, pinch0 = 0, pinchD0 = 0;
 let vyaw = 0, vpitch = 0, lastTap = 0;
+// ручное регулирование орбит: долгий тап по орбу -> тяни вверх/вниз
+let grab = null, grabTimer = null;
+const ORBIT_MIN = 0.55, ORBIT_MAX = 2.6;
+function showOrbTune(o){
+  $('ot-t').textContent = 'ОРБИТА · ' + ENTITIES[o.entId].name;
+  updateOrbTune(o);
+  $('orbtune').classList.add('show');
+  const lb = $('ent-' + o.entId); if (lb) lb.classList.add('grabbed');
+}
+function updateOrbTune(o){
+  const f = o.userOrbit || 1;
+  $('ot-t').textContent = 'ОРБИТА · ' + ENTITIES[o.entId].name + ' · ×' + f.toFixed(2);
+  $('ot-m').style.left = ((f - ORBIT_MIN) / (ORBIT_MAX - ORBIT_MIN) * 100) + '%';
+}
+function hideOrbTune(){
+  $('orbtune').classList.remove('show');
+  document.querySelectorAll('.entlabel.grabbed').forEach(l => l.classList.remove('grabbed'));
+}
 const pointers = new Map();
 canvas.addEventListener('pointerdown', (e) => {
   pointers.set(e.pointerId, [e.clientX, e.clientY]);
   dragging = true; moved = 0; px = e.clientX; py = e.clientY;
   canvas.classList.add('drag');
-  canvas.setPointerCapture(e.pointerId);
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* ok */ }
+  // долгий тап по орбу свиты (не по главному) — взять его орбиту в руки
+  clearTimeout(grabTimer); grabTimer = null;
+  if (pointers.size === 1 && !grab){
+    const hit = pickOrb(e.clientX, e.clientY);
+    if (hit > 0 && orbs[hit].entId){
+      grabTimer = setTimeout(() => {
+        grabTimer = null;
+        if (moved >= 9 || pointers.size !== 1 || !dragging) return;
+        const o = orbs[hit];
+        grab = { idx: hit, y0: py, base: o.userOrbit || 1 };
+        dragging = false; vyaw = 0; vpitch = 0;
+        sndInit(); popSound();
+        showOrbTune(o);
+      }, 550);
+    }
+  }
 });
 canvas.addEventListener('pointermove', (e) => {
+  if (grab){
+    const o = orbs[grab.idx];
+    if (o){
+      // вверх — шире, вниз — уже; экспонента даёт мягкий ход у единицы
+      o.userOrbit = Math.min(ORBIT_MAX, Math.max(ORBIT_MIN, grab.base * Math.exp((grab.y0 - e.clientY) / 170)));
+      updateOrbTune(o);
+    }
+    return;
+  }
   if (!dragging) return;
   pointers.set(e.pointerId, [e.clientX, e.clientY]);
   if (pointers.size === 2){
@@ -861,12 +924,29 @@ canvas.addEventListener('pointermove', (e) => {
   }
   const dx = e.clientX - px, dy = e.clientY - py;
   moved += Math.abs(dx) + Math.abs(dy);
+  if (moved >= 9 && grabTimer){ clearTimeout(grabTimer); grabTimer = null; } // повёл камеру — не долгий тап
   px = e.clientX; py = e.clientY;
   cam.yaw -= dx * 0.005;
   cam.pitch = Math.min(1.2, Math.max(-1.2, cam.pitch + dy * 0.005));
   vyaw = -dx * 0.005; vpitch = dy * 0.005;
 });
 function endPointer(e){
+  clearTimeout(grabTimer); grabTimer = null;
+  if (grab){
+    pointers.delete(e.pointerId);
+    const o = orbs[grab.idx];
+    if (o && o.entId){
+      let f = o.userOrbit || 1;
+      if (Math.abs(f - 1) < 0.07){ f = 1; o.userOrbit = 1; delete S.orbits[o.entId]; }
+      else S.orbits[o.entId] = Math.round(f * 100) / 100;
+      persist(); // орбита переживает перезапуск (localStorage + git-память)
+      say('sys', '⟳ орбита ' + ENTITIES[o.entId].name + (f === 1 ? ' — как была' : ' теперь ×' + f.toFixed(2) + ' · запомнил'));
+    }
+    hideOrbTune();
+    grab = null; dragging = false; moved = 99;
+    canvas.classList.remove('drag');
+    return;
+  }
   pointers.delete(e.pointerId);
   if (pointers.size < 2) pinch0 = 0;
   if (pointers.size === 1){
@@ -1080,7 +1160,7 @@ function tickOrbs(t){
     const tear = Math.min(Math.max((birth - 0.6) / 0.32, 0), 1);
     o.k = birth >= 1 ? 0.02 : lerp(orbs[o.parent].rad * 1.05, 0.02, tear * tear);
     let slotPos;
-    const grow = o.boost || 1; // авторасширение орбиты при тесноте
+    const grow = (o.boost || 1) * (o.userOrbit || 1); // теснота × ручная настройка хозяина
     if (o.level === 1){
       const a = o.slot * Math.PI/2 + t * 0.05;
       slotPos = [ Math.cos(a)*2.4*grow, Math.sin(t*0.5 + o.phase)*0.14, Math.sin(a)*2.4*grow ];
@@ -1345,6 +1425,7 @@ function persistLocal(){
       notes: S.notes, knowledge: S.knowledge, voiceOut: S.voiceOut,
       history: S.history.slice(-16), ts: Date.now(), accessKey: S.accessKey,
       usage: S.usage, orbStats: S.orbStats, rules: S.rules, immortal: S.immortal, wishes: S.wishes,
+      orbits: S.orbits,
     }));
   } catch { /* ok */ }
 }
@@ -1356,7 +1437,7 @@ function persist(){
   gitTimer = setTimeout(() => {
     fetch('/api/memory', {
       method: 'POST', headers: apiHeaders(),
-      body: JSON.stringify({ data: { notes: S.notes, knowledge: S.knowledge, rules: S.rules, immortal: S.immortal, wishes: S.wishes, scout: S._scout, ts: Date.now() } }),
+      body: JSON.stringify({ data: { notes: S.notes, knowledge: S.knowledge, rules: S.rules, immortal: S.immortal, wishes: S.wishes, orbits: S.orbits, scout: S._scout, ts: Date.now() } }),
     }).catch(() => {});
   }, 8000);
 }
@@ -1403,6 +1484,7 @@ async function loadMemory(){
       if (Array.isArray(local.rules)) S.rules = local.rules;
       if (local.immortal && local.immortal.baseTs) S.immortal = local.immortal;
       if (Array.isArray(local.wishes)) S.wishes = local.wishes;
+      if (local.orbits && typeof local.orbits === 'object') S.orbits = local.orbits;
     }
     updateGauge();
   } catch { /* ok */ }
@@ -1417,6 +1499,7 @@ async function loadMemory(){
         if (Array.isArray(j.data.rules)) S.rules = j.data.rules;
         if (j.data.immortal && j.data.immortal.baseTs) S.immortal = j.data.immortal;
         if (Array.isArray(j.data.wishes)) S.wishes = j.data.wishes;
+        if (j.data.orbits && typeof j.data.orbits === 'object') S.orbits = j.data.orbits;
         if (j.data.scout){
           S._scout = j.data.scout; // не перетирать труды разведчика при записи
           if (j.data.scout.lastReport && j.data.scout.lastRun > (parseInt(localStorage.getItem('taimen-scout-seen') || '0', 10))){
@@ -2051,6 +2134,64 @@ function popSound(){
     src.connect(f); f.connect(g); g.connect(sndCtx.destination); src.start();
   } catch { /* ok */ }
 }
+// разделение почки: тягучка — скрипучее натяжение ползёт вверх, потом мокрый
+// разрыв (хлопок + капля вниз + брызги). Синхронизирован с моментом отрыва шейки.
+function tearSound(){
+  if (!sndCtx) return;
+  try {
+    const t = sndCtx.currentTime, sr = sndCtx.sampleRate;
+    // натяжение: скрип с дрожью, тон и фильтр ползут вверх — плёнка вот-вот лопнет
+    const o1 = sndCtx.createOscillator(); o1.type = 'sawtooth';
+    o1.frequency.setValueAtTime(85, t);
+    o1.frequency.exponentialRampToValueAtTime(330, t + 0.85);
+    const wob = sndCtx.createOscillator(); wob.frequency.value = 12;
+    const wg = sndCtx.createGain(); wg.gain.value = 24;
+    wob.connect(wg); wg.connect(o1.frequency);
+    const f1 = sndCtx.createBiquadFilter(); f1.type = 'bandpass'; f1.Q.value = 7;
+    f1.frequency.setValueAtTime(280, t);
+    f1.frequency.exponentialRampToValueAtTime(950, t + 0.85);
+    const g1 = sndCtx.createGain();
+    g1.gain.setValueAtTime(0.0001, t);
+    g1.gain.exponentialRampToValueAtTime(0.07, t + 0.5);
+    g1.gain.exponentialRampToValueAtTime(0.11, t + 0.82);
+    g1.gain.exponentialRampToValueAtTime(0.0001, t + 0.88);
+    o1.connect(f1); f1.connect(g1); g1.connect(sndCtx.destination);
+    o1.start(t); o1.stop(t + 0.9); wob.start(t); wob.stop(t + 0.9);
+    // разрыв: шумовой хлопок, съезжающий вниз
+    const dur = 0.3;
+    const buf = sndCtx.createBuffer(1, sr * dur, sr), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2.2);
+    const src = sndCtx.createBufferSource(); src.buffer = buf;
+    const f2 = sndCtx.createBiquadFilter(); f2.type = 'bandpass';
+    f2.frequency.setValueAtTime(1500, t + 0.85);
+    f2.frequency.exponentialRampToValueAtTime(230, t + 1.12);
+    const g2 = sndCtx.createGain();
+    g2.gain.setValueAtTime(0.30, t + 0.85);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 1.15);
+    src.connect(f2); f2.connect(g2); g2.connect(sndCtx.destination); src.start(t + 0.85);
+    // капля: низкий тон падает — масса отскочила
+    const dr = sndCtx.createOscillator(); dr.type = 'sine';
+    dr.frequency.setValueAtTime(290, t + 0.86);
+    dr.frequency.exponentialRampToValueAtTime(65, t + 1.25);
+    const g3 = sndCtx.createGain();
+    g3.gain.setValueAtTime(0.17, t + 0.86);
+    g3.gain.exponentialRampToValueAtTime(0.001, t + 1.3);
+    dr.connect(g3); g3.connect(sndCtx.destination); dr.start(t + 0.86); dr.stop(t + 1.35);
+    // брызги: три коротких мокрых щелчка вразнобой
+    for (let k = 0; k < 3; k++){
+      const bt = t + 0.9 + k * 0.055 + Math.random() * 0.025;
+      const bd = 0.05, b2 = sndCtx.createBuffer(1, sr * bd, sr), dd = b2.getChannelData(0);
+      for (let i = 0; i < dd.length; i++) dd[i] = (Math.random() * 2 - 1) * (1 - i / dd.length);
+      const s2 = sndCtx.createBufferSource(); s2.buffer = b2;
+      const bf = sndCtx.createBiquadFilter(); bf.type = 'bandpass';
+      bf.frequency.value = 900 + Math.random() * 1300; bf.Q.value = 3;
+      const bg = sndCtx.createGain();
+      bg.gain.setValueAtTime(0.06, bt);
+      bg.gain.exponentialRampToValueAtTime(0.001, bt + bd);
+      s2.connect(bf); bf.connect(bg); bg.connect(sndCtx.destination); s2.start(bt);
+    }
+  } catch { /* ok */ }
+}
 
 /* новости версии: астероиды замедляются к центру, где висит «что нового» */
 function showUpdateNews(cb){
@@ -2112,7 +2253,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 /* отладочный хук (демо/диагностика) */
 window.TAIMEN = { cam, orbs, S, spawnOrb, toggleEntity, setStatus, focusOrb, showInfo, orbIdxByEnt,
-  pulse: (v) => { speechEnv = v; } };
+  pickOrb, pulse: (v) => { speechEnv = v; } };
 </script>
 </body>
 </html>
