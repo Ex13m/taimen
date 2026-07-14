@@ -1,6 +1,6 @@
 // ТАЙМЕНЬ · service worker: офлайн-оболочка, API всегда по сети
 const CACHE = 'taimen-v1';
-const SHELL = ['/', 'manifest.json', 'icon-192.png', 'icon-512.png'];
+const SHELL = ['/', 'manifest.json', 'icon-192.png', 'icon-512.png', 'sounds/birth.wav'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

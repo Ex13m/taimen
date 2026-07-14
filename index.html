@@ -79,7 +79,11 @@
     max-height: 26vh; overflow-y: auto; display: flex; flex-direction: column; gap: 7px;
     padding: 4px 2px; scrollbar-width: thin; scrollbar-color: rgba(110,168,255,.3) transparent;
   }
-  .msg{ max-width: 86%; padding: 8px 12px; border-radius: 12px; font-size: 14px; white-space: pre-wrap; user-select: text; }
+  .msg{ max-width: 86%; padding: 8px 26px 8px 12px; border-radius: 12px; font-size: 14px;
+    white-space: pre-wrap; user-select: text; -webkit-user-select: text; position: relative; }
+  .msg .copy{ position: absolute; right: 4px; top: 4px; font-size: 12px; line-height: 1;
+    padding: 4px 5px; opacity: .4; cursor: pointer; user-select: none; -webkit-user-select: none; }
+  .msg .copy:active{ opacity: 1; }
   .msg.user{ align-self: flex-end; background: rgba(110,168,255,.16); border: 1px solid rgba(110,168,255,.25); }
   .msg.taimen{ align-self: flex-start; background: rgba(30,40,90,.35); border: 1px solid rgba(120,160,255,.14); }
   .msg.sys{ align-self: center; font-size: 12px; color: var(--dim); background: none; padding: 2px 8px; }
@@ -302,7 +306,7 @@
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · щипок — ближе · тап по шару — слово ему · долгий тап — его орбита в руках</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.9.0 · © 2026 Ex13m</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.10.0 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -356,12 +360,13 @@
    ========================================================= */
 
 const MAXO = 9;
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.10.0';
 const WHATS_NEW = [
-  '✌ два пальца — зум и перемещение сцены (вверх/вниз/в стороны); один палец — вращение, как было',
-  'звук стал мягким: водяное натяжение и округлый бульк вместо стука при появлении почек',
-  '⟳ орбиты в твоих руках: долгий тап по орбу — тяни вверх/вниз; запоминается навсегда',
-  '⎈ штурвал (рукоять слева): прижми и веди палец по дереву команд',
+  'орбиты выправлены: круговые, в разных наклонённых плоскостях — Стратег, Шпион и Иммортал больше не пересекаются и не гуляют сами',
+  '🚀 ракеты теперь читаемы: крупнее, медленнее, с подписью «кто → кому · что» над каждой',
+  'у каждого орба свой голос по назначению: Хранитель — бас, Шпион — быстрый вкрадчивый, Иммортал — неземной (бесплатно; с ключом ElevenLabs — живые тембры)',
+  'звук рождения — студийный файл: натяжение, бульк, пузырьки; без стука',
+  '⧉ на каждой реплике — копировать одним тапом; ✌ два пальца — зум и перемещение сцены',
 ];
 
 /* ---------- Шейдеры ---------- */
@@ -683,6 +688,25 @@ function say(role, text, cls){
     div.appendChild(who);
   }
   div.appendChild(document.createTextNode(text));
+  // ⧉ копировать: передать реплику другому агенту / в другое окно одним тапом
+  const cp = document.createElement('span');
+  cp.className = 'copy'; cp.textContent = '⧉'; cp.title = 'копировать';
+  cp.onclick = (e) => {
+    e.stopPropagation();
+    const done = () => { cp.textContent = '✓'; setTimeout(() => { cp.textContent = '⧉'; }, 1100); };
+    const fallback = () => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); ta.remove(); done();
+      } catch { /* ок, хотя бы выделяемо */ }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText)
+      navigator.clipboard.writeText(text).then(done, fallback);
+    else fallback();
+  };
+  div.appendChild(cp);
   logEl.appendChild(div);
   logEl.scrollTop = logEl.scrollHeight;
   while (logEl.children.length > 60) logEl.removeChild(logEl.firstChild);
@@ -823,7 +847,7 @@ function spawnOrb(entId, parentIdx, level){
     radT: level === 3 ? 0.13 : level === 2 ? 0.20 : 0.42,
     style: mkStyle(), seed: 1.3 + orbs.length * 2.17,
     sigil: e.sigil, sigVis: 0, palA: e.pal[0], palB: e.pal[1],
-    phase: Math.random() * 6.28, boost: 1,
+    phase: Math.random() * 6.28,
     userOrbit: (S.orbits && S.orbits[entId]) || 1, // ручная настройка орбиты — переживает перезапуск
   };
   orbs.push(o);
@@ -912,7 +936,7 @@ canvas.addEventListener('pointermove', (e) => {
     if (o){
       // вверх — шире, вниз — уже; экспонента даёт мягкий ход у единицы.
       // Нижний предел — по геометрии: дитя не топится внутрь родителя
-      const baseR = o.level === 3 ? 0.44 : o.level === 2 ? 0.80 : 2.4;
+      const baseR = o.level === 3 ? 0.38 : o.level === 2 ? 1.0 : 2.6;
       const par = orbs[o.parent];
       const minF = Math.max(ORBIT_MIN, ((par ? par.radT : 1) + o.radT) * 1.08 / baseR);
       o.userOrbit = Math.min(ORBIT_MAX, Math.max(minF, grab.base * Math.exp((grab.y0 - e.clientY) / 170)));
@@ -1072,7 +1096,7 @@ async function analyzeArticle(text){
     while (S.immortal.analyses.length > 30) S.immortal.analyses.pop();
     S.immortal.shiftMs += a.shift * 86400000;
     persist();
-    launchRocket('shpion', 'immortal');
+    launchRocket('shpion', 'immortal', 'статья на анализ');
     const iIdx = orbIdxByEnt('immortal');
     if (iIdx >= 0) showInfo(iIdx); // перерисовать окно
     say('sys', '⌛ Иммортал: ' + (a.rating >= 0 ? '+' : '') + a.rating + ' · сдвиг ' +
@@ -1184,21 +1208,27 @@ function tickOrbs(t){
     const tear = Math.min(Math.max((birth - 0.6) / 0.32, 0), 1);
     o.k = birth >= 1 ? 0.02 : lerp(orbs[o.parent].rad * 1.05, 0.02, tear * tear);
     let slotPos;
-    const grow = (o.boost || 1) * (o.userOrbit || 1); // теснота × ручная настройка хозяина
+    // радиус постоянный: только ручная настройка хозяина; сами орбы не сближаются и не разбегаются
+    const grow = o.userOrbit || 1;
     if (o.level === 1){
       const a = o.slot * Math.PI/2 + t * 0.05;
-      slotPos = [ Math.cos(a)*2.4*grow, Math.sin(t*0.5 + o.phase)*0.14, Math.sin(a)*2.4*grow ];
+      slotPos = [ Math.cos(a)*2.6*grow, Math.sin(t*0.5 + o.phase)*0.10, Math.sin(a)*2.6*grow ];
     } else {
-      // полная 360°-орбита вокруг родителя в наклонённой плоскости (видно объём)
+      // честная круговая орбита вокруг родителя: постоянный радиус, своя наклонённая
+      // плоскость (наклон i + узел Ω) — плоскости разведены, чтобы не пересекаться
       const pp = orbs[o.parent].pos;
-      const R2 = (o.level === 3 ? 0.44 : 0.80) * grow;
+      const R2 = (o.level === 3 ? 0.38 : 1.0) * grow;
       const spd = o.level === 3 ? 0.85 : 0.42;
-      const tilt = o.level === 3 ? 0.55 : 0.32; // наклон плоскости орбиты
-      const a2 = t*spd + o.phase;
+      const incl = o.level === 3 ? 1.0 : 0.55;   // наклон плоскости
+      const node = o.level === 3 ? 2.4 : 0.9;    // поворот узла — плоскости разные
+      const th = t*spd + o.phase;
+      const ci = Math.cos(incl), si = Math.sin(incl);
+      const cN = Math.cos(node), sN = Math.sin(node);
+      const cth = Math.cos(th), sth = Math.sin(th);
       slotPos = [
-        pp[0] + Math.cos(a2)*R2,
-        pp[1] + Math.sin(a2)*R2*tilt,
-        pp[2] + Math.sin(a2)*R2*(1 - tilt*0.45),
+        pp[0] + R2 * (cN*cth - sN*sth*ci),
+        pp[1] + R2 * (sth*si),
+        pp[2] + R2 * (sN*cth + cN*sth*ci),
       ];
     }
     const pp = orbs[o.parent].pos;
@@ -1222,20 +1252,8 @@ function tickOrbs(t){
     }
   });
 
-  // теснота: задевают друг друга — орбиты расходятся (родитель-дитя не считаем)
-  for (let i = 1; i < orbs.length; i++){
-    const oi = orbs[i];
-    if ((t - oi.birthT) < 4.4) continue;
-    let crowded = false;
-    for (let j = 0; j < orbs.length; j++){
-      if (i === j || oi.parent === j || orbs[j].parent === i) continue;
-      const oj = orbs[j];
-      const dx = oi.pos[0]-oj.pos[0], dy = oi.pos[1]-oj.pos[1], dz = oi.pos[2]-oj.pos[2];
-      if (Math.hypot(dx, dy, dz) < (oi.rad + oj.rad) * 1.35){ crowded = true; break; }
-    }
-    if (crowded) oi.boost = Math.min(oi.level === 1 ? 1.35 : 2.2, (oi.boost || 1) + 0.012);
-    else oi.boost = (oi.boost || 1) + (1 - (oi.boost || 1)) * 0.004; // плавно домой
-  }
+  // авторасширение убрано по воле хозяина: орбы не сближаются и не разбегаются
+  // сами — непересечение обеспечено геометрией (радиусы и разведённые плоскости)
 
   // камера
   if (cam.focus >= 0 && cam.focus < orbs.length){
@@ -1306,14 +1324,16 @@ function project(b, wp){
   };
 }
 
-/* маленькие 3D-ракеты между орбами при взаимодействиях */
+/* 3D-ракеты между орбами: видно, кто кому что шлёт */
 const rockets = [];
-function launchRocket(fromEnt, toEnt){
+function launchRocket(fromEnt, toEnt, what){
   const a = fromEnt === 'main' ? 0 : orbIdxByEnt(fromEnt);
   const bI = toEnt === 'main' ? 0 : orbIdxByEnt(toEnt);
   if (a < 0 || bI < 0 || a === bI || rockets.length > 8) return;
-  rockets.push({ a, b: bI, e: 0, dur: 1.4 + Math.random()*0.7,
-    side: Math.random() < 0.5 ? 1 : -1, lift: 0.3 + Math.random()*0.5, trail: [] });
+  const nameOf = (i) => i === 0 ? 'TAIMEN' : ENTITIES[orbs[i].entId].name;
+  rockets.push({ a, b: bI, e: 0, dur: 2.6 + Math.random()*0.8,
+    side: Math.random() < 0.5 ? 1 : -1, lift: 0.3 + Math.random()*0.5, trail: [],
+    label: nameOf(a) + ' → ' + nameOf(bI) + (what ? ' · ' + what : '') });
 }
 const fxCv = $('fx');
 const fxCtx = fxCv ? fxCv.getContext('2d') : null;
@@ -1342,28 +1362,39 @@ function drawRockets(bas, t){
     const p = project(bas, mid);
     if (!p) continue;
     rk.trail.push({ x: p.x, y: p.y, z: p.z });
-    if (rk.trail.length > 14) rk.trail.shift();
-    // хвост
+    if (rk.trail.length > 22) rk.trail.shift();
+    // хвост — длиннее и ярче
     for (let i = 0; i < rk.trail.length; i++){
       const tp = rk.trail[i], k = i / rk.trail.length;
-      const sz = Math.max(0.6, 5 / tp.z * (0.3 + k));
+      const sz = Math.max(0.8, 9 / tp.z * (0.3 + k));
       fxCtx.beginPath();
-      fxCtx.fillStyle = 'rgba(' + (255) + ',' + Math.round(170 + 60*k) + ',' + Math.round(90 + 120*k) + ',' + (0.10 + 0.4*k) + ')';
+      fxCtx.fillStyle = 'rgba(' + (255) + ',' + Math.round(170 + 60*k) + ',' + Math.round(90 + 120*k) + ',' + (0.12 + 0.5*k) + ')';
       fxCtx.arc(tp.x, tp.y, sz, 0, 7);
       fxCtx.fill();
     }
-    // корпус: капля по направлению движения
+    // корпус: капля по направлению движения — крупная, заметная
     const prev = rk.trail[rk.trail.length - 2] || p;
     const ang = Math.atan2(p.y - prev.y, p.x - prev.x);
-    const s = Math.max(2, 13 / p.z);
+    const s = Math.max(3.5, 24 / p.z);
     fxCtx.save();
     fxCtx.translate(p.x, p.y); fxCtx.rotate(ang);
-    fxCtx.shadowColor = 'rgba(255,220,150,.9)'; fxCtx.shadowBlur = 10;
+    fxCtx.shadowColor = 'rgba(255,220,150,.95)'; fxCtx.shadowBlur = 14;
     fxCtx.fillStyle = '#fff';
     fxCtx.beginPath();
     fxCtx.moveTo(s, 0); fxCtx.lineTo(-s*0.7, s*0.42); fxCtx.lineTo(-s*0.4, 0); fxCtx.lineTo(-s*0.7, -s*0.42);
     fxCtx.closePath(); fxCtx.fill();
     fxCtx.restore();
+    // подпись: кто → кому · что (парит над ракетой, тает к прилёту)
+    if (rk.label){
+      const alpha = Math.min(1, 4 / p.z) * (e < 0.85 ? 1 : (1 - e) / 0.15);
+      fxCtx.save();
+      fxCtx.font = '10px "Segoe UI", system-ui, sans-serif';
+      fxCtx.textAlign = 'center';
+      fxCtx.shadowColor = 'rgba(110,168,255,.9)'; fxCtx.shadowBlur = 8;
+      fxCtx.fillStyle = 'rgba(223,233,255,' + (0.85 * alpha) + ')';
+      fxCtx.fillText(rk.label, p.x, p.y - Math.max(10, 26 / p.z));
+      fxCtx.restore();
+    }
   }
 }
 
@@ -1406,7 +1437,7 @@ function toggleEntity(id){
     el.classList.remove('active');
     $('active-entity').style.display = 'none';
     focusOrb(0);
-    launchRocket(id, 'main');
+    launchRocket(id, 'main', 'вернул слово');
     say('sys', '↩ снова говорит сам Таймень');
   } else {
     if (S.activeEntity){ const p = $('ent-' + S.activeEntity); if (p) p.classList.remove('active'); }
@@ -1416,7 +1447,7 @@ function toggleEntity(id){
     ae.textContent = '◈ на связи: ' + ENTITIES[id].name;
     ae.style.display = 'block';
     if (idx > 0) focusOrb(idx);
-    launchRocket('main', id);
+    launchRocket('main', id, 'передал слово');
     say('sys', '◈ ' + ENTITIES[id].name + ' слушает (' + ENTITIES[id].hint + ')');
   }
 }
@@ -1432,7 +1463,7 @@ function suggestEntity(id){
   const el = $('ent-' + id);
   if (S.activeEntity !== id && el){
     el.classList.add('suggested');
-    launchRocket('main', id);
+    launchRocket('main', id, 'зову на помощь');
     say('sys', '✦ ' + e.name + ' вступает: ' + e.hint + ' — тап по его шару, чтобы передать слово');
     setTimeout(() => el.classList.remove('suggested'), 45000);
   }
@@ -1716,7 +1747,7 @@ async function sendMessage(text){
     for (const note of p.notes){
       if (!S.notes.some(n => n.toLowerCase() === note.toLowerCase())){
         S.notes.push(note);
-        launchRocket('main', 'hranitel');
+        launchRocket('main', 'hranitel', 'заметка в память');
         say('sys', '⛬ запомнил: ' + note);
       }
     }
@@ -1733,7 +1764,7 @@ async function sendMessage(text){
     for (const w of p.wishes){
       if (!S.wishes.some(x => x.text.toLowerCase() === w.toLowerCase())){
         S.wishes.push({ text: w, ts: Date.now() });
-        launchRocket('main', 'strateg');
+        launchRocket('main', 'strateg', 'пожелание в книгу');
         say('sys', '☆ в книгу пожеланий: ' + w + ' — ночной мастер возьмётся');
       }
     }
@@ -1814,6 +1845,7 @@ function micMeterOff(){
 function startListening(){
   if (!SRec || S.state === 'listening') return;
   try { window.speechSynthesis && speechSynthesis.cancel(); } catch { /* ok */ }
+  if (cloudAudio){ try { cloudAudio.pause(); } catch { /* ok */ } } // не говорить себе в микрофон
   recog = new SRec();
   recog.lang = 'ru-RU'; recog.interimResults = true; recog.continuous = false;
   let finalText = '';
@@ -1872,14 +1904,54 @@ function pickVoice(){
             vs.find(v => /ru/i.test(v.lang)) || null;
 }
 if (window.speechSynthesis){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
-function speak(text){
-  if (!S.voiceOut || !window.speechSynthesis || !text){ if (S.state === 'thinking' || S.state === 'speaking') setStatus('idle'); return; }
+// у каждого орба свой голос — по назначению (браузерный синтез: тон/темп; облако: свой тембр)
+const VOICE_CHAR = {
+  main:     { pitch: 0.75, rate: 0.97 }, // дух глубин — низкий, размеренный
+  strateg:  { pitch: 0.90, rate: 1.06 }, // собранный, чуть быстрее
+  analitik: { pitch: 1.12, rate: 1.12 }, // точный, скорый
+  pisar:    { pitch: 1.00, rate: 0.94 }, // тёплый рассказчик
+  hranitel: { pitch: 0.62, rate: 0.88 }, // старый бас, никуда не спешит
+  shpion:   { pitch: 1.05, rate: 1.18 }, // быстрый, вкрадчивый
+  immortal: { pitch: 1.30, rate: 0.85 }, // неземной, тянет слова
+};
+// облачный голос глубин (/api/tts, ElevenLabs); 501/404 = не подключён, больше не пробуем
+let cloudVoiceOk = true;
+let cloudAudio = null;
+async function speakCloud(clean, speaker){
+  if (!cloudVoiceOk) return false;
+  try {
+    const res = await fetch('/api/tts', { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ text: clean, orb: speaker }) });
+    if (res.status === 501 || res.status === 404){ cloudVoiceOk = false; return false; } // голос не подключён — не долбим
+    if (!res.ok) return false;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    if (cloudAudio){ try { cloudAudio.pause(); } catch { /* ok */ } }
+    const a = cloudAudio = new Audio(url);
+    return await new Promise((resolve) => {
+      let pulse = null;
+      const finish = (ok) => {
+        clearInterval(pulse); speechEnv = 0;
+        if (S.state === 'speaking') setStatus('idle');
+        URL.revokeObjectURL(url); resolve(ok);
+      };
+      a.onplay = () => {
+        setStatus('speaking'); speechEnv = 0.5;
+        pulse = setInterval(() => { if (!a.paused) speechEnv = 0.4 + Math.random() * 0.4; }, 140);
+      };
+      a.onended = () => finish(true);
+      a.onerror = () => finish(false);
+      a.play().catch(() => finish(false));
+    });
+  } catch { return false; }
+}
+function speakLocal(clean, speaker){
+  if (!window.speechSynthesis){ if (S.state === 'thinking' || S.state === 'speaking') setStatus('idle'); return; }
   try {
     speechSynthesis.cancel();
-    const clean = text.replace(/[*_#\`>\[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 800);
     const u = new SpeechSynthesisUtterance(clean);
     if (ruVoice) u.voice = ruVoice;
-    u.lang = 'ru-RU'; u.rate = 1.0; u.pitch = 0.8;
+    const ch = VOICE_CHAR[speaker] || VOICE_CHAR.main;
+    u.lang = 'ru-RU'; u.rate = ch.rate; u.pitch = ch.pitch;
     u.onstart = () => { setStatus('speaking'); speechEnv = 0.5; };
     u.onboundary = () => { speechEnv = 0.45 + Math.random() * 0.35; };
     u.onend = () => { speechEnv = 0; if (S.state === 'speaking') setStatus('idle'); };
@@ -1887,11 +1959,21 @@ function speak(text){
     speechSynthesis.speak(u);
   } catch { setStatus('idle'); }
 }
+function speak(text, speaker){
+  if (!S.voiceOut || !text){ if (S.state === 'thinking' || S.state === 'speaking') setStatus('idle'); return; }
+  speaker = speaker || S.activeEntity || 'main';
+  const clean = text.replace(/[*_#\`>\[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 600);
+  if (!clean){ if (S.state === 'thinking' || S.state === 'speaking') setStatus('idle'); return; }
+  speakCloud(clean, speaker).then((ok) => { if (!ok) speakLocal(clean, speaker); });
+}
 
 $('spk').onclick = () => {
   S.voiceOut = !S.voiceOut;
   $('spk').classList.toggle('on', S.voiceOut);
-  if (!S.voiceOut){ try { speechSynthesis.cancel(); } catch { /* ok */ } }
+  if (!S.voiceOut){
+    try { speechSynthesis.cancel(); } catch { /* ok */ }
+    if (cloudAudio){ try { cloudAudio.pause(); } catch { /* ok */ } }
+  }
   persist();
 };
 
@@ -2158,14 +2240,21 @@ function popSound(){
     o.connect(g); g.connect(sndCtx.destination); o.start(t); o.stop(t + 0.15);
   } catch { /* ok */ }
 }
-// разделение почки: мягкое водяное — тёплое натяжение синусом ползёт вверх,
-// в момент отрыва — округлый «булькающий» глиссандо-спуск. Без шумовых хлопков
-// и стуков; все атаки плавные. Синхронизирован с моментом отрыва шейки.
+// разделение почки: студийный файл sounds/birth.wav (натяжение -> бульк -> пузырьки),
+// при недоступности — синтез тем же характером. Синхронизирован с отрывом шейки.
 let lastTearAt = -10;
 function tearSound(){
+  const now = performance.now() / 1000;
+  if (now - lastTearAt < 1.0) return; // залповый старт: не наслаивать
+  lastTearAt = now;
+  try {
+    const a = new Audio('sounds/birth.wav');
+    a.volume = 0.6;
+    a.play().catch(() => tearSynth());
+  } catch { tearSynth(); }
+}
+function tearSynth(){
   if (!sndCtx) return;
-  if (sndCtx.currentTime - lastTearAt < 1.0) return; // залповый старт: не наслаивать
-  lastTearAt = sndCtx.currentTime;
   try {
     const t = sndCtx.currentTime;
     // натяжение: тёплый тихий тон с лёгкой дрожью поднимается — тянется

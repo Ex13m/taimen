@@ -161,9 +161,21 @@ function ev(method, body, ip) {
   assert.ok(JSON.parse(r.body).error.includes('споткнулся'), 'человеческий текст ошибки');
   delete process.env.REPLICATE_API_TOKEN;
 
-  // tts заглушка
-  r = await tts.handler({});
-  assert.equal(r.statusCode, 501, 'tts -> 501');
+  // tts: GET -> 405; POST без ключа -> 501 (браузерный голос); с ключом -> audio base64
+  r = await tts.handler({ httpMethod: 'GET', headers: {} });
+  assert.equal(r.statusCode, 405, 'tts GET -> 405');
+  delete process.env.ELEVENLABS_API_KEY;
+  r = await tts.handler({ httpMethod: 'POST', headers: {}, body: '{"text":"привет"}' });
+  assert.equal(r.statusCode, 501, 'tts без ключа -> 501');
+  process.env.ELEVENLABS_API_KEY = 'el-test';
+  global.fetch = async () => ({ ok: true, status: 200, arrayBuffer: async () => new TextEncoder().encode('MP3DATA').buffer });
+  r = await tts.handler({ httpMethod: 'POST', headers: {}, body: '{"text":"привет"}' });
+  assert.equal(r.statusCode, 200, 'tts с ключом -> 200');
+  assert.equal(r.isBase64Encoded, true, 'база64-аудио');
+  assert.equal(Buffer.from(r.body, 'base64').toString(), 'MP3DATA', 'тело — аудио как есть');
+  r = await tts.handler({ httpMethod: 'POST', headers: {}, body: '{"text":""}' });
+  assert.equal(r.statusCode, 400, 'пустой text -> 400');
+  delete process.env.ELEVENLABS_API_KEY;
 
   // memory без токена
   delete process.env.GITHUB_TOKEN;
