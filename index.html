@@ -306,7 +306,7 @@
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · щипок — ближе · тап по шару — слово ему · долгий тап — его орбита в руках</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.11.0 · © 2026 Ex13m</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.12.0 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -360,12 +360,12 @@
    ========================================================= */
 
 const MAXO = 9;
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.12.0';
 const WHATS_NEW = [
-  'честное 3D: поверхность планет реально выдавливается техно-сеткой линий — живое дрожание рельефом, не плоская заливка; у каждого свой рисунок + светящаяся сетка и сканирующая волна',
-  'новая стратегия «Галактика»: агент = планета цивилизации, которая решает задачу; растёт как цивилизация и как игра (docs/STRATEGY-GALAXY.md, Книга галактики в PDF)',
-  'орбиты выправлены: круговые в разных наклонённых плоскостях — планеты не пересекаются и не гуляют сами',
-  '🚀 ракеты читаемы: крупнее, медленнее, с подписью «кто → кому · что»; ⧉ копирование реплик; ✌ два пальца — зум и перемещение',
+  'у каждой планеты свой техно-узор по назначению, реально выдавленный на поверхности: Стратег — меридианы-маршруты, Аналитик — дата-полосы, Писарь — руны, Хранитель — гексо-грани, Шпион — скан-развёртка, Иммортал — кольца-часы',
+  'атмосферный обод: планеты светятся цветным «небом» по краю; линии света точно на гребнях рельефа',
+  'стратегия «Галактика»: агент = планета цивилизации, которая решает задачу (docs/STRATEGY-GALAXY.md, Книга галактики в PDF)',
+  'орбиты не пересекаются и не гуляют сами; 🚀 ракеты с подписью «кто → кому · что»; ⧉ копирование реплик; ✌ два пальца — зум и перемещение',
 ];
 
 /* ---------- Шейдеры ---------- */
@@ -407,9 +407,34 @@ float smin(float a, float b, float k){
   return mix(b, a, h) - k*h*(1.0-h);
 }
 
+/* техно-узор поверхности планеты по её назначению (биому).
+   Возвращает 0..1 гребень-линию; одна формула питает и рельеф (sdOrb),
+   и свечение (материал) — линии света ложатся ровно на гребни. */
+float techLines(vec3 dir, float biome, float freq, float t, float flow){
+  float lon = atan(dir.z, dir.x);
+  float lat = asin(clamp(dir.y, -1.0, 1.0));
+  float g = freq;
+  float rib;
+  if (biome < 0.5){                 // 0 ядро/Стратег — меридианы-маршруты
+    rib = max(abs(sin(lon*g + t*1.3*flow)), abs(sin(lat*g*0.6)) * 0.6);
+  } else if (biome < 1.5){          // 1 Аналитик — широтные дата-полосы
+    rib = abs(sin(lat*g*1.3 - t*1.6*flow));
+  } else if (biome < 2.5){          // 2 Писарь — диагональные руны
+    rib = abs(sin((lon + lat*1.3)*g*0.7 + t*1.1*flow));
+  } else if (biome < 3.5){          // 3 Хранитель — гексо-грани кристалла
+    vec2 h = vec2(lon, lat)*g*0.5;
+    rib = abs(sin(h.x) + sin(h.x*0.5 + h.y*0.87) + sin(h.x*0.5 - h.y*0.87)) * 0.34;
+  } else if (biome < 4.5){          // 4 Шпион — сканирующая полоса-развёртка
+    rib = smoothstep(0.7, 1.0, sin(lat*2.4 - t*(2.4 + flow)));
+  } else {                          // 5 Иммортал — концентрические кольца-часы
+    rib = abs(sin(length(vec2(lon, lat*2.0))*g - t*1.7*flow));
+  }
+  return clamp(rib, 0.0, 1.0);
+}
+
 /* дистанция до орба с органическим смещением поверхности
    (uniform-массивы индексируются только счётчиком цикла — требование GLSL ES 1.0) */
-float sdOrb(vec3 p, vec4 pr, float flow, float ampl, float pulse, float seed){
+float sdOrb(vec3 p, vec4 pr, float flow, float ampl, float pulse, float seed, float biome){
   vec3 q = p - pr.xyz;
   float R = pr.w;
   float l = length(q);
@@ -420,27 +445,21 @@ float sdOrb(vec3 p, vec4 pr, float flow, float ampl, float pulse, float seed){
     float n1 = fbm3(dir*2.6 + seed + t*0.14*flow) - 0.5;
     float n2 = fbm3(dir*6.0 - seed*1.7 - t*0.22*flow) - 0.5;
     base -= (n1*0.7 + n2*0.4) * (ampl + pulse*0.06) * R * 2.4;
-    /* честное 3D-дрожание ЛИНИЯМИ: техно-сетка широт/долгот реально
-       выдавливает поверхность — бегущие светящиеся гребни (не только цвет) */
-    float lon = atan(dir.z, dir.x);        // долгота
-    float lat = asin(clamp(dir.y, -1.0, 1.0)); // широта
-    float gr = 9.0 + seed*3.0;             // частота сетки (свой рисунок у планеты)
-    float rib = sin(lon*gr + t*1.6*flow) * sin(lat*gr - t*1.1*flow);
-    float ridge = pow(abs(rib), 6.0);      // тонкие острые гребни-линии
-    // бегущая волна-пульс по широтам — «дышит» рельефом
-    float pulseLine = sin(lat*gr*0.5 - t*(2.2 + flow*1.8));
-    base -= (ridge*0.55 + pow(max(pulseLine,0.0),3.0)*0.35)
-            * (0.020 + ampl*1.3 + pulse*0.10) * R * 2.2;
+    /* честное 3D-дрожание ЛИНИЯМИ по назначению планеты: узор реально
+       выдавливает поверхность (не только цвет) — свои гребни у каждого биома */
+    float freq = 8.0 + seed*2.0;
+    float ridge = pow(techLines(dir, biome, freq, t, flow), 4.0);
+    base -= (ridge*0.6 + 0.02) * (0.020 + ampl*1.3 + pulse*0.10) * R * 2.2;
   }
   return base;
 }
 
 float map(vec3 p, out vec3 gcol){
-  float d = sdOrb(p, u_posRad[0], u_style[0].x, u_style[0].y, u_style[0].z, u_misc[0].y);
+  float d = sdOrb(p, u_posRad[0], u_style[0].x, u_style[0].y, u_style[0].z, u_misc[0].y, u_misc[0].z);
   gcol = (u_colA[0]+u_colB[0]) * 0.5 * exp(-max(d,0.0)*4.5);
   for (int i = 1; i < ${MAXO}; i++){
     if (i >= u_count) break;
-    float di = sdOrb(p, u_posRad[i], u_style[i].x, u_style[i].y, u_style[i].z, u_misc[i].y);
+    float di = sdOrb(p, u_posRad[i], u_style[i].x, u_style[i].y, u_style[i].z, u_misc[i].y, u_misc[i].z);
     d = smin(d, di, max(u_misc[i].x, 0.001));
     gcol += (u_colA[i]+u_colB[i]) * 0.5 * exp(-max(di,0.0)*4.5);
   }
@@ -521,12 +540,9 @@ void main(){
     float wv = sin((nr.x*7.0 + nr.y*5.0 + f1*4.0) - t*(2.0 + st.x*2.5));
     float wave = pow(wv*0.5 + 0.5, 3.0) * (0.25 + st.z*1.4);
 
-    /* светящаяся техно-сетка планеты (те же гребни, что и в рельефе) */
-    float lon2 = atan(nr.z, nr.x), lat2 = asin(clamp(nr.y, -1.0, 1.0));
-    float gr2 = 9.0 + ms.y*3.0;
-    float grid = pow(abs(sin(lon2*gr2 + t*1.6*st.x) * sin(lat2*gr2 - t*1.1*st.x)), 8.0);
-    float scan = pow(max(sin(lat2*gr2*0.5 - t*(2.2 + st.x*1.8)), 0.0), 4.0); // сканирующая волна
-    float techno = grid*0.9 + scan*0.5;
+    /* светящиеся техно-линии — тот же узор, что и в рельефе (свет на гребнях) */
+    float freq2 = 8.0 + ms.y*2.0;
+    float techno = pow(techLines(dir, ms.z, freq2, t, st.x), 5.0) * 1.3;
 
     float m = clamp(fbm2(sp*2.0 + ms.y*2.7 + t*0.08) + (fil-0.5)*0.6, 0.0, 1.0);
     vec3 col = mix(colA, colB, m);
@@ -537,8 +553,12 @@ void main(){
     float spec = pow(max(dot(reflect(rd, n), L1), 0.0), 30.0);
 
     float bright = 0.30 + st.w*0.65;
+    /* атмосфера: цветной обод-небо планеты (мягкое рассеивание к краю) */
+    float atmo = pow(fres, 1.4);
+    vec3 atmoCol = mix(colB, vec3(0.6, 0.8, 1.0), 0.4);
     c = col * (fres*3.4 + diff*0.25 + fil*1.15 + veins*0.6 + wave*1.25 + 0.10) * bright
-      + (col*0.6 + vec3(0.5,0.7,1.0)*0.5) * techno * (1.1 + st.w*1.4)  /* светящиеся техно-линии */
+      + (col*0.5 + vec3(0.55,0.75,1.0)*0.6) * techno * (1.2 + st.w*1.5)  /* линии света на гребнях */
+      + atmoCol * atmo * (0.5 + st.w*0.7)          /* атмосферный обод */
       + col * pow(fres, 3.0) * 2.2                 /* плазменный обод */
       + vec3(0.9, 0.95, 1.0) * spec * 0.5 * bright;
 
