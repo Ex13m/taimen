@@ -302,7 +302,7 @@
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · щипок — ближе · тап по шару — слово ему · долгий тап — его орбита в руках</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.8.0 · © 2026 Ex13m</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.9.0 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -356,12 +356,12 @@
    ========================================================= */
 
 const MAXO = 9;
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 const WHATS_NEW = [
-  '⟳ орбиты в твоих руках: долгий тап по орбу — держи и тяни вверх (шире) или вниз (уже); отпустил — запомнил навсегда, переживает перезапуск',
-  'звук разделения стал живым: тягучее скрипучее натяжение, мокрый разрыв, капля и брызги — в момент отрыва почки',
-  '⎈ штурвал (рукоять слева): прижми и веди палец по дереву команд — орбы, вид, голос, знания, звук',
-  'запасной мозг: при недоступном Anthropic отвечают бесплатные модели OpenRouter (или Replicate)',
+  '✌ два пальца — зум и перемещение сцены (вверх/вниз/в стороны); один палец — вращение, как было',
+  'звук стал мягким: водяное натяжение и округлый бульк вместо стука при появлении почек',
+  '⟳ орбиты в твоих руках: долгий тап по орбу — тяни вверх/вниз; запоминается навсегда',
+  '⎈ штурвал (рукоять слева): прижми и веди палец по дереву команд',
 ];
 
 /* ---------- Шейдеры ---------- */
@@ -861,6 +861,7 @@ function camBasis(){
 
 /* ввод: облёт с инерцией, зум, тап, двойной тап — домой */
 let dragging = false, moved = 0, px = 0, py = 0, pinch0 = 0, pinchD0 = 0;
+let panX0 = 0, panY0 = 0; // центр двух пальцев — перемещение сцены
 let vyaw = 0, vpitch = 0, lastTap = 0;
 // ручное регулирование орбит: долгий тап по орбу -> тяни вверх/вниз
 let grab = null, grabTimer = null;
@@ -924,8 +925,22 @@ canvas.addEventListener('pointermove', (e) => {
   if (pointers.size === 2){
     const pts = [...pointers.values()];
     const d = Math.hypot(pts[0][0]-pts[1][0], pts[0][1]-pts[1][1]);
-    if (!pinch0){ pinch0 = d; pinchD0 = cam.goalDist; }
+    const cxm = (pts[0][0] + pts[1][0]) / 2, cym = (pts[0][1] + pts[1][1]) / 2;
+    if (!pinch0){ pinch0 = d; pinchD0 = cam.goalDist; panX0 = cxm; panY0 = cym; }
     cam.goalDist = Math.min(40, Math.max(0.4, pinchD0 * pinch0 / Math.max(d, 20)));
+    // два пальца вместе — перемещение сцены (вверх/вниз/в стороны), фокус отпускается
+    const dxc = cxm - panX0, dyc = cym - panY0;
+    if (dxc || dyc){
+      const b = camBasis();
+      const s = cam.dist * 0.0016;
+      cam.focus = -1;
+      cam.goalTarget = [
+        Math.max(-20, Math.min(20, cam.goalTarget[0] - b.right[0]*dxc*s + b.up[0]*dyc*s)),
+        Math.max(-20, Math.min(20, cam.goalTarget[1] - b.right[1]*dxc*s + b.up[1]*dyc*s)),
+        Math.max(-20, Math.min(20, cam.goalTarget[2] - b.right[2]*dxc*s + b.up[2]*dyc*s)),
+      ];
+      panX0 = cxm; panY0 = cym;
+    }
     return;
   }
   const dx = e.clientX - px, dy = e.clientY - py;
@@ -2129,80 +2144,62 @@ function boomSound(){
   } catch { /* ok */ }
 }
 function popSound(){
+  // мягкий блик подтверждения (штурвал/захват) — без шумового стука
   if (!sndCtx) return;
   try {
-    const dur = 0.22, sr = sndCtx.sampleRate;
-    const buf = sndCtx.createBuffer(1, sr * dur, sr), d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
-    const src = sndCtx.createBufferSource(); src.buffer = buf;
-    const f = sndCtx.createBiquadFilter(); f.type = 'bandpass';
-    f.frequency.setValueAtTime(700, sndCtx.currentTime);
-    f.frequency.exponentialRampToValueAtTime(180, sndCtx.currentTime + dur);
+    const t = sndCtx.currentTime;
+    const o = sndCtx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(760, t);
+    o.frequency.exponentialRampToValueAtTime(390, t + 0.11);
     const g = sndCtx.createGain();
-    g.gain.setValueAtTime(0.22, sndCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, sndCtx.currentTime + dur);
-    src.connect(f); f.connect(g); g.connect(sndCtx.destination); src.start();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.06, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    o.connect(g); g.connect(sndCtx.destination); o.start(t); o.stop(t + 0.15);
   } catch { /* ok */ }
 }
-// разделение почки: тягучка — скрипучее натяжение ползёт вверх, потом мокрый
-// разрыв (хлопок + капля вниз + брызги). Синхронизирован с моментом отрыва шейки.
+// разделение почки: мягкое водяное — тёплое натяжение синусом ползёт вверх,
+// в момент отрыва — округлый «булькающий» глиссандо-спуск. Без шумовых хлопков
+// и стуков; все атаки плавные. Синхронизирован с моментом отрыва шейки.
 let lastTearAt = -10;
 function tearSound(){
   if (!sndCtx) return;
-  if (sndCtx.currentTime - lastTearAt < 1.0) return; // залповый старт: разрывы не наслаиваются в кашу
+  if (sndCtx.currentTime - lastTearAt < 1.0) return; // залповый старт: не наслаивать
   lastTearAt = sndCtx.currentTime;
   try {
-    const t = sndCtx.currentTime, sr = sndCtx.sampleRate;
-    // натяжение: скрип с дрожью, тон и фильтр ползут вверх — плёнка вот-вот лопнет
-    const o1 = sndCtx.createOscillator(); o1.type = 'sawtooth';
-    o1.frequency.setValueAtTime(85, t);
-    o1.frequency.exponentialRampToValueAtTime(330, t + 0.85);
-    const wob = sndCtx.createOscillator(); wob.frequency.value = 12;
-    const wg = sndCtx.createGain(); wg.gain.value = 24;
+    const t = sndCtx.currentTime;
+    // натяжение: тёплый тихий тон с лёгкой дрожью поднимается — тянется
+    const o1 = sndCtx.createOscillator(); o1.type = 'sine';
+    o1.frequency.setValueAtTime(150, t);
+    o1.frequency.exponentialRampToValueAtTime(320, t + 0.82);
+    const wob = sndCtx.createOscillator(); wob.frequency.value = 6.5;
+    const wg = sndCtx.createGain(); wg.gain.value = 7;
     wob.connect(wg); wg.connect(o1.frequency);
-    const f1 = sndCtx.createBiquadFilter(); f1.type = 'bandpass'; f1.Q.value = 7;
-    f1.frequency.setValueAtTime(280, t);
-    f1.frequency.exponentialRampToValueAtTime(950, t + 0.85);
     const g1 = sndCtx.createGain();
     g1.gain.setValueAtTime(0.0001, t);
-    g1.gain.exponentialRampToValueAtTime(0.07, t + 0.5);
-    g1.gain.exponentialRampToValueAtTime(0.11, t + 0.82);
-    g1.gain.exponentialRampToValueAtTime(0.0001, t + 0.88);
-    o1.connect(f1); f1.connect(g1); g1.connect(sndCtx.destination);
+    g1.gain.linearRampToValueAtTime(0.035, t + 0.45);
+    g1.gain.linearRampToValueAtTime(0.05, t + 0.8);
+    g1.gain.linearRampToValueAtTime(0.0001, t + 0.88);
+    o1.connect(g1); g1.connect(sndCtx.destination);
     o1.start(t); o1.stop(t + 0.9); wob.start(t); wob.stop(t + 0.9);
-    // разрыв: шумовой хлопок, съезжающий вниз
-    const dur = 0.3;
-    const buf = sndCtx.createBuffer(1, sr * dur, sr), d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2.2);
-    const src = sndCtx.createBufferSource(); src.buffer = buf;
-    const f2 = sndCtx.createBiquadFilter(); f2.type = 'bandpass';
-    f2.frequency.setValueAtTime(1500, t + 0.85);
-    f2.frequency.exponentialRampToValueAtTime(230, t + 1.12);
+    // отрыв: округлый бульк — быстрый глиссандо вниз с мягкой атакой
+    const bl = sndCtx.createOscillator(); bl.type = 'sine';
+    bl.frequency.setValueAtTime(560, t + 0.84);
+    bl.frequency.exponentialRampToValueAtTime(170, t + 1.02);
     const g2 = sndCtx.createGain();
-    g2.gain.setValueAtTime(0.30, t + 0.85);
-    g2.gain.exponentialRampToValueAtTime(0.001, t + 1.15);
-    src.connect(f2); f2.connect(g2); g2.connect(sndCtx.destination); src.start(t + 0.85);
-    // капля: низкий тон падает — масса отскочила
-    const dr = sndCtx.createOscillator(); dr.type = 'sine';
-    dr.frequency.setValueAtTime(290, t + 0.86);
-    dr.frequency.exponentialRampToValueAtTime(65, t + 1.25);
+    g2.gain.setValueAtTime(0.0001, t + 0.84);
+    g2.gain.linearRampToValueAtTime(0.09, t + 0.87);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 1.08);
+    bl.connect(g2); g2.connect(sndCtx.destination); bl.start(t + 0.84); bl.stop(t + 1.1);
+    // тихое эхо-бульк октавой ниже — масса качнулась
+    const b2 = sndCtx.createOscillator(); b2.type = 'sine';
+    b2.frequency.setValueAtTime(300, t + 1.0);
+    b2.frequency.exponentialRampToValueAtTime(110, t + 1.2);
     const g3 = sndCtx.createGain();
-    g3.gain.setValueAtTime(0.17, t + 0.86);
-    g3.gain.exponentialRampToValueAtTime(0.001, t + 1.3);
-    dr.connect(g3); g3.connect(sndCtx.destination); dr.start(t + 0.86); dr.stop(t + 1.35);
-    // брызги: три коротких мокрых щелчка вразнобой
-    for (let k = 0; k < 3; k++){
-      const bt = t + 0.9 + k * 0.055 + Math.random() * 0.025;
-      const bd = 0.05, b2 = sndCtx.createBuffer(1, sr * bd, sr), dd = b2.getChannelData(0);
-      for (let i = 0; i < dd.length; i++) dd[i] = (Math.random() * 2 - 1) * (1 - i / dd.length);
-      const s2 = sndCtx.createBufferSource(); s2.buffer = b2;
-      const bf = sndCtx.createBiquadFilter(); bf.type = 'bandpass';
-      bf.frequency.value = 900 + Math.random() * 1300; bf.Q.value = 3;
-      const bg = sndCtx.createGain();
-      bg.gain.setValueAtTime(0.06, bt);
-      bg.gain.exponentialRampToValueAtTime(0.001, bt + bd);
-      s2.connect(bf); bf.connect(bg); bg.connect(sndCtx.destination); s2.start(bt);
-    }
+    g3.gain.setValueAtTime(0.0001, t + 1.0);
+    g3.gain.linearRampToValueAtTime(0.04, t + 1.03);
+    g3.gain.exponentialRampToValueAtTime(0.001, t + 1.28);
+    b2.connect(g3); g3.connect(sndCtx.destination); b2.start(t + 1.0); b2.stop(t + 1.3);
   } catch { /* ok */ }
 }
 
