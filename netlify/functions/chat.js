@@ -193,8 +193,9 @@ function clientIp(event) {
 async function askOpenRouter(messages, system, maxTokens) {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) return null;
-  // первым — выбранная модель, затем остальная цепочка (без дублей)
-  const models = [OPENROUTER_MODEL, ...OPENROUTER_CHAIN].filter((m, i, a) => a.indexOf(m) === i);
+  // первым — выбранная модель, затем цепочка (без дублей); OpenRouter принимает
+  // не более 3 моделей в массиве — берём топ-3
+  const models = [OPENROUTER_MODEL, ...OPENROUTER_CHAIN].filter((m, i, a) => a.indexOf(m) === i).slice(0, 3);
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 9000);
   let res;
@@ -416,10 +417,15 @@ exports.handler = async (event) => {
     const WRAP_RESERVE = 3500; // резерв времени под завершающий текстовый ответ
     const remain = () => HARD_WALL - (Date.now() - t0);
 
+    let didTools = false;
     for (let round = 0; round <= TOOL_ROUNDS_MAX; round++) {
       if (remain() < 800) break; // нет времени на ещё вызов — отдаём, что есть
       // инструменты — только не на последнем раунде и пока хватит времени на финал
       const offerTools = handsOn && round < TOOL_ROUNDS_MAX && remain() > (WRAP_RESERVE + 1500);
+      // после «рук» финальную сборку делаем быстрым Sonnet (Fable с размышлением
+      // не успеет в остаток) — чтобы приходил настоящий ответ, а не извинение
+      const roundModel = (didTools && !offerTools) ? 'claude-sonnet-5' : model;
+      const roundFable = roundModel === 'claude-fable-5';
       const ac = new AbortController();
       const tm = setTimeout(() => ac.abort(), Math.max(1500, remain()));
       let res;
@@ -432,12 +438,12 @@ exports.handler = async (event) => {
             'anthropic-version': API_VERSION,
             // серверный фолбэк: если классификаторы Fable отказали — тот же запрос
             // дослуживает Opus 4.8 внутри того же вызова
-            ...(isFable ? { 'anthropic-beta': 'server-side-fallback-2026-06-01' } : {}),
+            ...(roundFable ? { 'anthropic-beta': 'server-side-fallback-2026-06-01' } : {}),
           },
           body: JSON.stringify({
-            model, max_tokens: maxTokens, system, messages: convo,
+            model: roundModel, max_tokens: maxTokens, system, messages: convo,
             ...(offerTools ? { tools: TOOLS } : {}),
-            ...(isFable ? { fallbacks: [{ model: FABLE_FALLBACK }] } : {}),
+            ...(roundFable ? { fallbacks: [{ model: FABLE_FALLBACK }] } : {}),
           }),
         });
       } catch (e) {
@@ -476,6 +482,7 @@ exports.handler = async (event) => {
 
       const toolUses = (data.content || []).filter((b) => b.type === 'tool_use');
       if (data.stop_reason !== 'tool_use' || !toolUses.length || !offerTools) break;
+      didTools = true;
 
       // исполняем инструменты ПАРАЛЛЕЛЬНО (не более 3), возвращаем результаты
       convo.push({ role: 'assistant', content: data.content });
