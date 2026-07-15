@@ -210,7 +210,9 @@ async function askOpenRouter(messages, system, maxTokens) {
       body: JSON.stringify({
         models,                      // цепочка: OpenRouter сам перебирает при отказе
         max_tokens: maxTokens,
-        provider: { allow_fallbacks: true, data_collection: 'deny' },
+        // allow_fallbacks — да; data_collection НЕ ограничиваем: почти все :free
+        // модели требуют разрешённого сбора данных, иначе отсеиваются все.
+        provider: { allow_fallbacks: true },
         messages: [
           ...(system ? [{ role: 'system', content: system }] : []),
           ...messages,
@@ -226,7 +228,7 @@ async function askOpenRouter(messages, system, maxTokens) {
     return { error:
       res.status === 401 || res.status === 402 ? 'Запасной мозг: ключ OpenRouter не подошёл или кончился баланс.'
       : res.status === 429 ? 'Запасной мозг: все бесплатные модели заняты. Попробуй позже.'
-      : 'Запасной мозг сейчас недоступен. Попробуй ещё раз.' };
+      : 'Запасной мозг: OpenRouter вернул ' + res.status + (detail ? ' · ' + String(detail).slice(0, 160) : '') };
   }
   const data = await res.json();
   const usedModel = data.model || OPENROUTER_MODEL; // OpenRouter вернёт, кто реально ответил
