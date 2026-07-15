@@ -30,6 +30,15 @@ jobs:
           [ -z "$SITE" ] && SITE="https://taimen-orb.netlify.app"
           echo "сайт: $SITE"
           mkdir -p docs/ops
+          # ждём, пока задеплоится нужная версия (в ней живёт diag:backup)
+          WANT="$(grep -o "APP_VERSION = '[^']*'" index.html | head -n1 | cut -d\' -f2)"
+          echo "жду версию $WANT на сайте…"
+          for i in $(seq 1 20); do
+            live=$(curl -s "$SITE/index.html" | grep -o "APP_VERSION = '[^']*'" | head -n1 | cut -d\' -f2)
+            echo "  попытка $i: на сайте $live"
+            [ "$live" = "$WANT" ] && break
+            sleep 15
+          done
           # 1) обычный запрос — кто отвечает по умолчанию
           code=$(curl -s -o docs/ops/brain-ping.json -w "%{http_code}" \
             -X POST "$SITE/api/chat" -H "content-type: application/json" \
