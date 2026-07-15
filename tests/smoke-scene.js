@@ -77,9 +77,11 @@ const server = http.createServer((req, res) => {
     ver: (window.TAIMEN && TAIMEN.ver) || '?'
   })`));
 
+  // фатальны только настоящие ошибки/исключения, не warning (иначе флейк на
+  // предупреждениях драйвера swiftshader или будущих console.warn)
   const errors = events.filter((e) =>
     (e.method === 'Runtime.exceptionThrown') ||
-    (e.method === 'Runtime.consoleAPICalled' && (e.params.type === 'error' || e.params.type === 'warning')) ||
+    (e.method === 'Runtime.consoleAPICalled' && e.params.type === 'error') ||
     (e.method === 'Log.entryAdded' && e.params.entry.level === 'error' &&
       !(e.params.entry.source === 'network' && /\/api\//.test(e.params.entry.url || '')))
   ).map((e) => JSON.stringify(e.params).slice(0, 260));

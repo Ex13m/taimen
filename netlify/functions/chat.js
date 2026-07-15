@@ -71,34 +71,59 @@ const PLANET_SYS = {
   immortal: 'Ты — Иммортис, планета отсчёта до бессмертия. Оцени с позиции продления жизни, честно про неопределённость. Кратко, по-русски.',
 };
 
+// приватный ли IPv4 (в т.ч. извлечённый из IPv4-mapped IPv6)
+function isPrivateV4(a, b){
+  if (a === 127 || a === 10 || a === 0) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 169 && b === 254) return true; // метаданные/link-local
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  return false;
+}
 // приватные/локальные/метадата-адреса — руки туда не ходят (защита от SSRF)
 function isBlockedHost(host){
   const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
   if (!h) return true;
   if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
-  if (h === '169.254.169.254' || h === 'metadata.google.internal') return true; // облачные метаданные
-  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80')) return true;
-  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (m){
-    const a = +m[1], b = +m[2];
-    if (a === 127 || a === 10 || a === 0) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
+  if (h === 'metadata.google.internal') return true;
+  // IPv6 (есть двоеточие): loopback, ULA, link-local + IPv4-mapped (::ffff:a.b.c.d)
+  if (h.includes(':')){
+    if (h === '::1' || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80')) return true;
+    if (h === '::' ) return true;
+    const md = h.match(/::ffff:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/);
+    if (md && isPrivateV4(+md[1], +md[2])) return true;
+    const mh = h.match(/::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})/); // ::ffff:7f00:1
+    if (mh){ const hi = parseInt(mh[1], 16), lo = parseInt(mh[2], 16);
+      if (isPrivateV4((hi >> 8) & 255, hi & 255)) return true; }
+    return false;
   }
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m && isPrivateV4(+m[1], +m[2])) return true;
+  if (h === '169.254.169.254') return true;
   return false;
 }
 
 async function toolFetchUrl(rawUrl){
   let u;
   try { u = new URL(String(rawUrl)); } catch { return 'ошибка: некорректный URL'; }
-  if (u.protocol !== 'https:') return 'ошибка: только https';
-  if (isBlockedHost(u.hostname)) return 'ошибка: этот адрес закрыт (локальный/приватный/метаданные)';
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 4500);
   try {
-    const res = await fetch(u.href, { signal: ctl.signal, redirect: 'follow',
-      headers: { 'user-agent': 'TaimenGalaxy/1.0 (+taimen)' } });
+    // редиректы следуем ВРУЧНУЮ, перепроверяя каждый хоп (иначе 302 → внутренний адрес)
+    let res, hops = 0;
+    let target = u;
+    while (true){
+      if (target.protocol !== 'https:') return 'ошибка: только https';
+      if (isBlockedHost(target.hostname)) return 'ошибка: этот адрес закрыт (локальный/приватный/метаданные)';
+      res = await fetch(target.href, { signal: ctl.signal, redirect: 'manual',
+        headers: { 'user-agent': 'TaimenGalaxy/1.0 (+taimen)' } });
+      if (res.status >= 300 && res.status < 400 && res.headers.get('location') && hops < 4){
+        hops += 1;
+        try { target = new URL(res.headers.get('location'), target); } catch { return 'ошибка: битый редирект'; }
+        continue;
+      }
+      break;
+    }
+    u = target;
     const raw = (await res.text()).slice(0, 300000);
     // грубое извлечение текста: режем скрипты/стили/теги, схлопываем пробелы
     const text = raw
@@ -115,12 +140,14 @@ async function toolFetchUrl(rawUrl){
   } finally { clearTimeout(timer); }
 }
 
-async function toolAskPlanet(apiKey, id, question, addCost){
+async function toolAskPlanet(apiKey, id, question, addCost, timeoutMs){
   const sys = PLANET_SYS[id];
   if (!sys) return 'ошибка: нет такой планеты (' + id + ')';
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), Math.max(1200, timeoutMs || 4000));
   try {
     const res = await fetch(ANTHROPIC_URL, {
-      method: 'POST',
+      method: 'POST', signal: ctl.signal,
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': API_VERSION },
       body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 500, system: sys,
         messages: [{ role: 'user', content: String(question).slice(0, 3000) }] }),
@@ -129,7 +156,8 @@ async function toolAskPlanet(apiKey, id, question, addCost){
     if (!res.ok) return 'планета молчит (' + res.status + ')';
     if (data.usage) addCost('claude-sonnet-5', data.usage);
     return (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim() || '(тишина)';
-  } catch { return 'планета недоступна'; }
+  } catch (e) { return (e && e.name === 'AbortError') ? 'планета не успела ответить' : 'планета недоступна'; }
+  finally { clearTimeout(timer); }
 }
 
 // Ограничитель в памяти инстанса функции. Не переживает холодный старт —
@@ -236,6 +264,8 @@ async function askReplicate(messages, system, maxTokens) {
   return { text, usage, model: 'replicate/' + REPLICATE_MODEL,
     cost: (usage.in * REPLICATE_PRICE[0] + usage.out * REPLICATE_PRICE[1]) / 1e6 };
 }
+
+exports.isBlockedHost = isBlockedHost; // для теста SSRF в CI
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -345,30 +375,47 @@ exports.handler = async (event) => {
     const convo = messages.map((m) => ({ role: m.role, content: m.content }));
     let usage = { in: 0, out: 0 };
     let data = null;
-    // жёсткий бюджет времени: функция Netlify живёт ~10с, за таймаутом — 504
-    // и запасной мозг уже не успевает. Держимся в TOOL_DEADLINE_MS.
+    // жёсткий бюджет времени: функция Netlify живёт ~10с, за таймаутом — 504.
+    // HARD_WALL — потолок всей возни с Anthropic; каждый вызов обрывается по
+    // остатку, инструменты раздаём только пока есть резерв на финальный ответ.
     const t0 = Date.now();
-    const TOOL_DEADLINE_MS = 7000;
+    const HARD_WALL = 9000;
+    const WRAP_RESERVE = 3500; // резерв времени под завершающий текстовый ответ
+    const remain = () => HARD_WALL - (Date.now() - t0);
 
     for (let round = 0; round <= TOOL_ROUNDS_MAX; round++) {
-      // инструменты даём только пока есть запас времени и не последний раунд
-      const offerTools = handsOn && round < TOOL_ROUNDS_MAX && (Date.now() - t0) < TOOL_DEADLINE_MS;
-      const res = await fetch(ANTHROPIC_URL, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': API_VERSION,
-          // серверный фолбэк: если классификаторы Fable отказали — тот же запрос
-          // дослуживает Opus 4.8 внутри того же вызова
-          ...(isFable ? { 'anthropic-beta': 'server-side-fallback-2026-06-01' } : {}),
-        },
-        body: JSON.stringify({
-          model, max_tokens: maxTokens, system, messages: convo,
-          ...(offerTools ? { tools: TOOLS } : {}),
-          ...(isFable ? { fallbacks: [{ model: FABLE_FALLBACK }] } : {}),
-        }),
-      });
+      if (remain() < 800) break; // нет времени на ещё вызов — отдаём, что есть
+      // инструменты — только не на последнем раунде и пока хватит времени на финал
+      const offerTools = handsOn && round < TOOL_ROUNDS_MAX && remain() > (WRAP_RESERVE + 1500);
+      const ac = new AbortController();
+      const tm = setTimeout(() => ac.abort(), Math.max(1500, remain()));
+      let res;
+      try {
+        res = await fetch(ANTHROPIC_URL, {
+          method: 'POST', signal: ac.signal,
+          headers: {
+            'content-type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': API_VERSION,
+            // серверный фолбэк: если классификаторы Fable отказали — тот же запрос
+            // дослуживает Opus 4.8 внутри того же вызова
+            ...(isFable ? { 'anthropic-beta': 'server-side-fallback-2026-06-01' } : {}),
+          },
+          body: JSON.stringify({
+            model, max_tokens: maxTokens, system, messages: convo,
+            ...(offerTools ? { tools: TOOLS } : {}),
+            ...(isFable ? { fallbacks: [{ model: FABLE_FALLBACK }] } : {}),
+          }),
+        });
+      } catch (e) {
+        clearTimeout(tm);
+        console.error('anthropic call aborted/failed', e && e.name);
+        if (data) break; // уже был ответ раньше — отдадим его
+        const backup = await viaBackup();
+        if (backup) return backup;
+        return json(200, { text: 'Задумался слишком глубоко — задай короче или по частям.', usage, model, budget: { spent: Math.round(daily.cost * 100) / 100, limit: parseFloat(process.env.DAILY_COST_LIMIT) || 5 }, trace });
+      }
+      clearTimeout(tm);
 
       if (!res.ok) {
         let detail = '';
@@ -406,7 +453,7 @@ exports.handler = async (event) => {
           trace.push({ tool: 'fetch_url', url: String((tu.input && tu.input.url) || '').slice(0, 200) });
         } else if (tu.name === 'ask_planet') {
           const pid = String((tu.input && tu.input.id) || '');
-          out = await toolAskPlanet(apiKey, pid, (tu.input && tu.input.question) || '', addCost);
+          out = await toolAskPlanet(apiKey, pid, (tu.input && tu.input.question) || '', addCost, remain() - 1000);
           trace.push({ tool: 'ask_planet', id: pid, q: String((tu.input && tu.input.question) || '').slice(0, 120) });
         } else {
           out = 'неизвестный инструмент';
@@ -428,7 +475,9 @@ exports.handler = async (event) => {
       .map((b) => b.text)
       .join('\n')
       .trim();
-    return json(200, { text, usage, model: data.model || model, budget, trace });
+    // никогда не отдаём пустоту (напр. оборвались на tool_use по времени)
+    const safeText = text || 'Задумался слишком глубоко — задай короче или по частям.';
+    return json(200, { text: safeText, usage, model: data.model || model, budget, trace });
   } catch (e) {
     console.error('proxy failure', e && e.message);
     const backup = await viaBackup();

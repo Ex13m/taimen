@@ -232,6 +232,14 @@ function ev(method, body, ip) {
   assert.equal(r.statusCode, 200, 'память с паролем -> 200');
   delete process.env.ACCESS_KEY;
 
+  // SSRF-гард рук: приватные/метадата/IPv4-mapped блокируются, публичные — нет
+  const bh = chat.isBlockedHost;
+  ['localhost', '127.0.0.1', '169.254.169.254', '10.1.2.3', '192.168.0.1',
+   '172.20.0.1', '::1', '[::ffff:127.0.0.1]', '::ffff:7f00:1', 'metadata.google.internal']
+    .forEach((h) => assert.equal(bh(h), true, 'должен блокироваться: ' + h));
+  ['fda.gov', 'fcc.gov', 'google.com', '1.1.1.1', 'openrouter.ai', 'api.anthropic.com']
+    .forEach((h) => assert.equal(bh(h), false, 'не должен блокироваться: ' + h));
+
   global.fetch = realFetch;
   console.log('ВСЕ ТЕСТЫ ПРОШЛИ ✓');
 })().catch((e) => { console.error('ТЕСТ УПАЛ:', e.message); process.exit(1); });
