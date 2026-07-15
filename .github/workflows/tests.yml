@@ -10,5 +10,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - name: Тесты функций (критерии E2 + пароль + бюджет)
+      - name: Парс-чек фронта (синтаксис + инвариант версии)
+        run: node tests/check-front.js
+      - name: Тесты функций (критерии E2 + пароль + бюджет + руки)
         run: node tests/test-functions.js
+
+  scene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Поставить Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
+      - name: Смоук сцены (шейдер слинковался, планеты живы, консоль чистая)
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node tests/smoke-scene.js

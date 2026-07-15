@@ -44,7 +44,7 @@ const PRICES = {
 // ---- Руки Тайменя: инструменты, которыми мозг действует сам ----
 // У функций Netlify открытый интернет — Таймень ходит в сеть и спрашивает
 // планеты без участия хозяина. Цикл ограничен и посчитан в бюджет.
-const TOOL_ROUNDS_MAX = 4;
+const TOOL_ROUNDS_MAX = 2;   // раунды инструментов (держим таймаут функции ~10с)
 const TOOLS = [
   {
     name: 'fetch_url',
@@ -71,12 +71,31 @@ const PLANET_SYS = {
   immortal: 'Ты — Иммортис, планета отсчёта до бессмертия. Оцени с позиции продления жизни, честно про неопределённость. Кратко, по-русски.',
 };
 
+// приватные/локальные/метадата-адреса — руки туда не ходят (защита от SSRF)
+function isBlockedHost(host){
+  const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (!h) return true;
+  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
+  if (h === '169.254.169.254' || h === 'metadata.google.internal') return true; // облачные метаданные
+  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80')) return true;
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m){
+    const a = +m[1], b = +m[2];
+    if (a === 127 || a === 10 || a === 0) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+  }
+  return false;
+}
+
 async function toolFetchUrl(rawUrl){
   let u;
   try { u = new URL(String(rawUrl)); } catch { return 'ошибка: некорректный URL'; }
   if (u.protocol !== 'https:') return 'ошибка: только https';
+  if (isBlockedHost(u.hostname)) return 'ошибка: этот адрес закрыт (локальный/приватный/метаданные)';
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 8000);
+  const timer = setTimeout(() => ctl.abort(), 4500);
   try {
     const res = await fetch(u.href, { signal: ctl.signal, redirect: 'follow',
       headers: { 'user-agent': 'TaimenGalaxy/1.0 (+taimen)' } });
@@ -103,8 +122,8 @@ async function toolAskPlanet(apiKey, id, question, addCost){
     const res = await fetch(ANTHROPIC_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': API_VERSION },
-      body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 700, system: sys,
-        messages: [{ role: 'user', content: String(question).slice(0, 4000) }] }),
+      body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 500, system: sys,
+        messages: [{ role: 'user', content: String(question).slice(0, 3000) }] }),
     });
     const data = await res.json();
     if (!res.ok) return 'планета молчит (' + res.status + ')';
@@ -326,8 +345,14 @@ exports.handler = async (event) => {
     const convo = messages.map((m) => ({ role: m.role, content: m.content }));
     let usage = { in: 0, out: 0 };
     let data = null;
+    // жёсткий бюджет времени: функция Netlify живёт ~10с, за таймаутом — 504
+    // и запасной мозг уже не успевает. Держимся в TOOL_DEADLINE_MS.
+    const t0 = Date.now();
+    const TOOL_DEADLINE_MS = 7000;
 
     for (let round = 0; round <= TOOL_ROUNDS_MAX; round++) {
+      // инструменты даём только пока есть запас времени и не последний раунд
+      const offerTools = handsOn && round < TOOL_ROUNDS_MAX && (Date.now() - t0) < TOOL_DEADLINE_MS;
       const res = await fetch(ANTHROPIC_URL, {
         method: 'POST',
         headers: {
@@ -340,7 +365,7 @@ exports.handler = async (event) => {
         },
         body: JSON.stringify({
           model, max_tokens: maxTokens, system, messages: convo,
-          ...(handsOn ? { tools: TOOLS } : {}),
+          ...(offerTools ? { tools: TOOLS } : {}),
           ...(isFable ? { fallbacks: [{ model: FABLE_FALLBACK }] } : {}),
         }),
       });
@@ -370,12 +395,11 @@ exports.handler = async (event) => {
       }
 
       const toolUses = (data.content || []).filter((b) => b.type === 'tool_use');
-      if (data.stop_reason !== 'tool_use' || !toolUses.length || round === TOOL_ROUNDS_MAX) break;
+      if (data.stop_reason !== 'tool_use' || !toolUses.length || !offerTools) break;
 
-      // исполняем инструменты и возвращаем результаты в разговор
+      // исполняем инструменты ПАРАЛЛЕЛЬНО (не более 3), возвращаем результаты
       convo.push({ role: 'assistant', content: data.content });
-      const results = [];
-      for (const tu of toolUses) {
+      const results = await Promise.all(toolUses.slice(0, 3).map(async (tu) => {
         let out;
         if (tu.name === 'fetch_url') {
           out = await toolFetchUrl(tu.input && tu.input.url);
@@ -387,8 +411,10 @@ exports.handler = async (event) => {
         } else {
           out = 'неизвестный инструмент';
         }
-        results.push({ type: 'tool_result', tool_use_id: tu.id, content: String(out).slice(0, 24000) });
-      }
+        return { type: 'tool_result', tool_use_id: tu.id, content: String(out).slice(0, 16000) };
+      }));
+      // лишние tool_use (сверх 3) закрываем пустышкой, чтобы протокол не сломался
+      toolUses.slice(3).forEach((tu) => results.push({ type: 'tool_result', tool_use_id: tu.id, content: 'пропущено (лимит инструментов)' }));
       convo.push({ role: 'user', content: results });
     }
 
