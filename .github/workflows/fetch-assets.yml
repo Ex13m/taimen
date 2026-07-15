@@ -1,40 +1,42 @@
-# Мост художника: качает сгенерированные картинки (Higgsfield/Replicate)
-# в репозиторий — обходит сетевые блоки рабочих сессий. Запуск только вручную
-# или из доверенной сессии через workflow_dispatch.
+# Мост художника: по пушу очереди docs/book2/hf/queue.tsv качает картинки
+# (Higgsfield/Replicate/Reve) в репозиторий — у Actions открытый интернет,
+# у рабочих сессий сеть зарезана. Формат очереди: url<TAB>путь_в_репо.
 name: fetch-assets
 
 on:
-  workflow_dispatch:
-    inputs:
-      url:
-        description: 'HTTPS-ссылка на файл (png/jpg/webp)'
-        required: true
-      path:
-        description: 'куда положить в репо (например docs/book2/hf/scene1.png)'
-        required: true
+  push:
+    branches: [main]
+    paths: ['docs/book2/hf/queue.tsv']
 
 concurrency: fetch-assets
 
 jobs:
   fetch:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: скачать и закоммитить
-        env:
-          URL: ${{ inputs.url }}
-          DEST: ${{ inputs.path }}
+      - name: скачать всё из очереди и закоммитить
         run: |
-          case "$DEST" in
-            *..*|/*) echo "недопустимый путь"; exit 1;;
-          esac
-          mkdir -p "$(dirname "$DEST")"
-          curl -fsSL --max-filesize 26214400 "$URL" -o "$DEST"
-          file "$DEST"
+          set -e
+          while IFS=$'\t' read -r url dest; do
+            [ -z "$url" ] && continue
+            case "$dest" in
+              *..*|/*) echo "пропуск недопустимого пути: $dest"; continue;;
+            esac
+            case "$url" in
+              https://*) ;;
+              *) echo "пропуск не-https: $url"; continue;;
+            esac
+            mkdir -p "$(dirname "$dest")"
+            echo "качаю: $url -> $dest"
+            curl -fsSL --max-filesize 26214400 "$url" -o "$dest" || { echo "не скачалось: $url"; continue; }
+            file "$dest"
+            git add "$dest"
+          done < docs/book2/hf/queue.tsv
           git config user.name "taimen-assets"
           git config user.email "assets@taimen.local"
-          git add "$DEST"
-          git commit -m "assets: $DEST [skip ci]" || exit 0
+          git commit -m "assets: картинки художника из очереди [skip ci]" || exit 0
           git push
