@@ -1,0 +1,40 @@
+# Мост художника: качает сгенерированные картинки (Higgsfield/Replicate)
+# в репозиторий — обходит сетевые блоки рабочих сессий. Запуск только вручную
+# или из доверенной сессии через workflow_dispatch.
+name: fetch-assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'HTTPS-ссылка на файл (png/jpg/webp)'
+        required: true
+      path:
+        description: 'куда положить в репо (например docs/book2/hf/scene1.png)'
+        required: true
+
+concurrency: fetch-assets
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: скачать и закоммитить
+        env:
+          URL: ${{ inputs.url }}
+          DEST: ${{ inputs.path }}
+        run: |
+          case "$DEST" in
+            *..*|/*) echo "недопустимый путь"; exit 1;;
+          esac
+          mkdir -p "$(dirname "$DEST")"
+          curl -fsSL --max-filesize 26214400 "$URL" -o "$DEST"
+          file "$DEST"
+          git config user.name "taimen-assets"
+          git config user.email "assets@taimen.local"
+          git add "$DEST"
+          git commit -m "assets: $DEST [skip ci]" || exit 0
+          git push

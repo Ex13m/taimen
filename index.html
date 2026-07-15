@@ -3,7 +3,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#060318">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -21,7 +21,8 @@
     --warn: #ff7a6e;
   }
   *{ box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  html, body{ height: 100%; overflow: hidden; }
+  html, body{ height: 100%; overflow: hidden;
+    touch-action: pan-y; overscroll-behavior: none; } /* щипок не зумит страницу — модалки не уезжают */
   body{
     font: 15px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
     color: var(--text);
@@ -306,7 +307,7 @@
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · щипок — ближе · тап по шару — слово ему · долгий тап — его орбита в руках</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.15.0 · © 2026 Ex13m</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.15.1 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -360,7 +361,7 @@
    ========================================================= */
 
 const MAXO = 12;
-const APP_VERSION = '1.15.0';
+const APP_VERSION = '1.15.1';
 const WHATS_NEW = [
   '⚔ планеты получили титулы цивилизации: СТРАТЕГОРУМ, ТАКТИКОРУМ, АНАЛИТИКУМ, СКРИПТОРУМ, КУСТОДЕС, СПЕКУЛЯТОР, ИММОРТИС, ПРОГРЕССОРУМ, ФИСКАТОРУМ',
   '⚔ новая планета ТАКТИКОРУМ — остриё замысла: превращает план Стратегорума в ходы и сроки, командует Прогрессорумом',
