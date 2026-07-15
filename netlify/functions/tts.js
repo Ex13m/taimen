@@ -16,6 +16,7 @@ let VOICES = {
   immortal: 'MF3mGyEYCl7XYWbV9V6O', // Elli — неземная
   progressor: 'onwK4e9ZLuTAKqWW03F9', // Daniel — зрелый, взвешенный
   bank: 'pNInz6obpgDQGcFmaJgB',       // Adam — сухой, деловой
+  taktik: 'TxGEqnHWrfWFTfGW9XjX',     // Josh — командный
 };
 try { VOICES = Object.assign(VOICES, JSON.parse(process.env.ELEVENLABS_VOICES || '{}')); } catch { /* дефолты */ }
 const MAX_CHARS = 600; // одна реплика

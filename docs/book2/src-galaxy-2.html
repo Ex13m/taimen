@@ -74,7 +74,7 @@
   <div style="position:relative; margin-top:12mm;">
     <h1>TAIMEN</h1>
     <div style="font-size:11pt; letter-spacing:.42em; color:var(--dim); margin-top:3mm;">КНИГА ГАЛАКТИКИ · ВЫПУСК 2</div>
-    <div style="font-size:9pt; letter-spacing:.28em; color:var(--gr); margin-top:7mm; text-shadow:0 0 12px rgba(111,220,79,.8);">САМОСОБИРАЮЩАЯ ЦИВИЛИЗАЦИЯ-ОС · v1.14.0</div>
+    <div style="font-size:9pt; letter-spacing:.28em; color:var(--gr); margin-top:7mm; text-shadow:0 0 12px rgba(111,220,79,.8);">САМОСОБИРАЮЩАЯ ЦИВИЛИЗАЦИЯ-ОС · v1.15.0</div>
   </div>
   <div style="position:absolute; bottom:0; left:0; right:0; height:158mm; display:flex; align-items:flex-end; justify-content:center;">
     <div style="position:absolute; bottom:22mm; left:50%; transform:translateX(-50%); width:120mm; height:24mm;
@@ -93,7 +93,7 @@
 
 <!-- ============ ЧТО ЕСТЬ СЕЙЧАС ============ -->
 <div class="page stars">
-  <h2><span class="n">01</span> · ЧТО ЕСТЬ СЕЙЧАС (v1.14.0)</h2>
+  <h2><span class="n">01</span> · ЧТО ЕСТЬ СЕЙЧАС (v1.15.0)</h2>
   <div class="two">
     <div class="card">
       <h3>РАЗУМ</h3>
@@ -125,7 +125,7 @@
     <img src="planets.png" style="width:100%; display:block;">
     <div style="padding:2mm 4mm;"><p class="dim" style="font-size:8pt;">Живой прототип: 8 планет, у каждой свой техно-узор и палитра, плазменный вид.</p></div>
   </div>
-  <div class="foot"><span>01 · СЕЙЧАС</span><span>CHANGELOG.md · v1.0.0 → v1.14.0</span></div>
+  <div class="foot"><span>01 · СЕЙЧАС</span><span>CHANGELOG.md · v1.0.0 → v1.15.0</span></div>
 </div>
 
 <!-- ============ ПАРАДИГМА + ГРАФИК МАССЫ ============ -->
@@ -302,9 +302,99 @@
   <div class="foot"><span>05 · ГРАФИКА И КАРТА</span><span>docs/SPEC-2.0.md · AUDIT</span></div>
 </div>
 
+<!-- ============ КЛЮЧИ: ИНСТРУКЦИЯ ПОДКЛЮЧЕНИЯ ============ -->
+<div class="page stars">
+  <h2><span class="n">06</span> · КЛЮЧИ — ИНСТРУКЦИЯ ПОДКЛЮЧЕНИЯ</h2>
+  <div class="card">
+    <p style="font-size:9.5pt;">Все ключи вставляются в одно место: <b>Netlify → Site configuration →
+    Environment variables → Add a variable</b>, после добавления — <b>Deploys →
+    Trigger deploy</b>. В код ключи не вставляются никогда.</p>
+  </div>
+  <table>
+    <tr><th>КЛЮЧ</th><th>ЗА ЧТО ОТВЕЧАЕТ</th><th>ГДЕ ВЗЯТЬ (шаги)</th></tr>
+    <tr><td><b>ANTHROPIC_API_KEY</b><br><span class="tag ok">есть</span></td>
+      <td>основной мозг: Тайменарх (Fable 5), планеты (Opus 4.8), субагенты (Sonnet 5)</td>
+      <td>console.anthropic.com → Billing (пополнить $5–10, поставить spend-cap!) → API Keys → Create Key → sk-ant-…</td></tr>
+    <tr><td><b>OPENROUTER_API_KEY</b><br><span class="tag am">ждёт</span></td>
+      <td>запасной мозг №1 — БЕСПЛАТНЫЕ :free модели (DeepSeek V3); отвечает, когда Anthropic молчит</td>
+      <td>openrouter.ai → Sign in (через Google, можно с телефона) → Keys → Create Key → sk-or-…</td></tr>
+    <tr><td><b>REPLICATE_API_TOKEN</b><br><span class="tag am">ждёт</span></td>
+      <td>запасной мозг №2 (Llama 3, копейки) + будущий художник (картинки FLUX ~$0.003)</td>
+      <td>replicate.com → Sign in → аватарка → API tokens → Create → r8_…</td></tr>
+    <tr><td><b>ELEVENLABS_API_KEY</b><br><span class="tag am">ждёт</span></td>
+      <td>живые голоса планет (у каждой свой тембр); без него — браузерный синтез</td>
+      <td>elevenlabs.io → Sign up (бесплатно ~10к символов/мес) → профиль → API Keys</td></tr>
+    <tr><td><b>GITHUB_TOKEN</b></td>
+      <td>git-память: заметки/правила/пожелания живут в ветке taimen-memory, доступны с любого устройства</td>
+      <td>GitHub → Settings → Developer settings → Fine-grained token → только репо taimen → Contents: Read/Write</td></tr>
+    <tr><td><b>ACCESS_KEY</b><br><span class="tag">этап 0 · важно</span></td>
+      <td>пароль-замок: чужие не жгут твои токены; на своём устройстве один раз пишешь в чат «пароль СЛОВО»</td>
+      <td>придумай слово сам → в Netlify ENV</td></tr>
+    <tr><td><b>CLAUDE_CODE_OAUTH_TOKEN</b><br><span class="tag am">ждёт</span></td>
+      <td>ночной мастер бесплатно по подписке Max (иначе — ANTHROPIC_API_KEY в GitHub Secrets, ~$2–5/ночь)</td>
+      <td>терминал с Claude Code: «claude setup-token» → GitHub → репо → Settings → Secrets → Actions</td></tr>
+  </table>
+  <div class="card" style="margin-top:3mm;">
+    <h3>НАСТРОЙКИ-ЛИМИТЫ (по желанию, дефолты разумные)</h3>
+    <p style="font-size:8pt;" class="dim">DAILY_LIMIT=200 обращений/день · DAILY_COST_LIMIT=$5/день (жёсткая отсечка 110%) ·
+    SCOUT_DAILY_COST=$0.5 на разведку · TTS_DAILY_CHARS=20000 символов голоса ·
+    OPENROUTER_MODEL / REPLICATE_MODEL / ELEVENLABS_VOICE(S) — смена моделей и тембров.</p>
+  </div>
+  <div class="foot"><span>06 · КЛЮЧИ</span><span>подробно: SETUP.md в репозитории</span></div>
+</div>
+
+<!-- ============ ПРОТОКОЛ СИСТЕМЫ ============ -->
+<div class="page stars">
+  <h2><span class="n">07</span> · ПРОТОКОЛ — ЧТО ЗА ЧТО ОТВЕЧАЕТ</h2>
+  <div class="two">
+    <div class="card">
+      <h3>ЧАСТИ СИСТЕМЫ</h3>
+      <table style="font-size:7.8pt;">
+        <tr><td><b>index.html</b></td><td>всё тело: 3D-сцена, чат, голос, жесты, штурвал</td></tr>
+        <tr><td><b>/api/chat</b></td><td>мозг-прокси: Anthropic → OpenRouter → Replicate, лимиты трат</td></tr>
+        <tr><td><b>/api/memory</b></td><td>git-память: чтение/запись memory.json в ветке taimen-memory</td></tr>
+        <tr><td><b>/api/tts</b></td><td>голос: ElevenLabs, тембр по планете, дневной потолок</td></tr>
+        <tr><td><b>scout</b></td><td>разведка Спекулятора по расписанию (3×/сутки): RSS → Иммортис</td></tr>
+        <tr><td><b>night-master</b></td><td>самокод: пожелание из книги → код → PR (03:17 UTC)</td></tr>
+        <tr><td><b>tests + смоук</b></td><td>страж: функции и сцена проверяются перед выпуском</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>ТЕГИ РАЗУМА (модель → система)</h3>
+      <table style="font-size:7.8pt;">
+        <tr><td><b>[[mood:X]]</b></td><td>настроение ядра → палитра и пластика (6 состояний)</td></tr>
+        <tr><td><b>[[orb:ID]]</b></td><td>планета вступает в разговор по компетенции</td></tr>
+        <tr><td><b>[[note:…]]</b></td><td>самосохранение: важное — в память (⛬)</td></tr>
+        <tr><td><b>[[rule:…]]</b></td><td>правило хозяина «отныне…» — принято навсегда</td></tr>
+        <tr><td><b>[[wish:…]]</b></td><td>пожелание ☆ — ночной мастер воплотит кодом</td></tr>
+      </table>
+      <h3 style="margin-top:3mm;">ПАМЯТЬ</h3>
+      <p style="font-size:7.8pt;" class="dim">localStorage (всегда) + git-ветка taimen-memory (с GITHUB_TOKEN):
+      заметки, знания, правила, пожелания, орбиты, Иммортис-журнал, разведка.</p>
+    </div>
+  </div>
+  <div class="card">
+    <h3>КТО ЧТО ДЕЛАЕТ (планеты, кратко)</h3>
+    <table style="font-size:7.8pt;">
+      <tr><td><b>ТАЙМЕНАРХ</b></td><td>ядро: говорит с Наблюдателем, ведёт свиту, копит массу</td><td><b>КУСТОДЕС</b></td><td>память: заметки, факты, история</td></tr>
+      <tr><td><b>СТРАТЕГОРУМ</b></td><td>замысел: планы, развилки, риски</td><td><b>СПЕКУЛЯТОР</b></td><td>разведка: источники, выжимки, доклады</td></tr>
+      <tr><td><b>ТАКТИКОРУМ</b></td><td>манёвр: ходы, сроки, критерии готовности; командует Прогрессорумом</td><td><b>ИММОРТИС</b></td><td>отсчёт до бессмертия, анализ статей ±</td></tr>
+      <tr><td><b>ПРОГРЕССОРУМ</b></td><td>мягкое развитие, Третий Путь, «1$ на бессмертие»</td><td><b>ФИСКАТОРУМ</b></td><td>казна: балансы, доходы, расходы, контроль трат</td></tr>
+      <tr><td><b>АНАЛИТИКУМ</b></td><td>числа, данные, разбор</td><td><b>СКРИПТОРУМ</b></td><td>тексты, письма, формулировки</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>ГОЛОСОВЫЕ КОМАНДЫ</h3>
+    <p style="font-size:8pt;" class="dim">«покажи спекулятора / иммортиса / всех» — наведение · «пароль СЛОВО» — замок ·
+    «отныне…» — правило · «хочу, чтобы ты умел…» — пожелание мастеру · долгий тап по планете — её орбита в руках ·
+    штурвал (рукоять слева) — всё управление одним пальцем.</p>
+  </div>
+  <div class="foot"><span>07 · ПРОТОКОЛ</span><span>полный протокол: docs/PROTOCOL.md (этап 2)</span></div>
+</div>
+
 <!-- ============ ЭКРАНЫ + ФИНАЛ ============ -->
 <div class="page stars">
-  <h2><span class="n">06</span> · ЭКРАНЫ И КЛЮЧИ</h2>
+  <h2><span class="n">08</span> · ЭКРАНЫ И ГОРИЗОНТ</h2>
   <div class="two">
     <div class="card">
       <h3>ЭКРАНЫ (что уже есть)</h3>
@@ -315,14 +405,11 @@
       <li>Экран «что нового» с астероидами; панель знаний и пожеланий</li></ul>
     </div>
     <div class="card">
-      <h3>КЛЮЧИ (вечером, ENV)</h3>
-      <table style="font-size:7.6pt;">
-        <tr><td>ANTHROPIC_API_KEY</td><td><span class="tag ok">есть</span></td></tr>
-        <tr><td>OPENROUTER_API_KEY</td><td><span class="tag am">ждёт</span></td></tr>
-        <tr><td>REPLICATE_API_TOKEN</td><td><span class="tag am">ждёт</span></td></tr>
-        <tr><td>ELEVENLABS_API_KEY</td><td><span class="tag am">ждёт</span></td></tr>
-        <tr><td>ACCESS_KEY (пароль)</td><td><span class="tag">этап 0</span></td></tr>
-      </table>
+      <h3>ГОРИЗОНТ</h3>
+      <ul class="gr" style="font-size:8.5pt;"><li>«обновись» голосом → мастер кодит → орб просит перегруз</li>
+      <li>Мастерская: любые файлы на вход, PDF с картинками на выход</li>
+      <li>Художник: «нарисуй…» → картинка; 3D-меши планет</li>
+      <li>Самопочинка: орб видит падение → сам пишет пожелание-фикс</li></ul>
     </div>
   </div>
   <div class="card">
@@ -339,7 +426,7 @@
     <p style="font-size:10pt; letter-spacing:.18em; color:#b8f0a6;">ГАЛАКТИКА РАСТЁТ ДАЛЬШЕ</p>
     <p class="dim" style="font-size:8pt; margin-top:1.5mm;">STRATEGY-GALAXY · SPEC-2.0 · AUDIT · DESIGN-BRIEF · CHANGELOG</p>
   </div>
-  <div class="foot"><span>06 · ЭКРАНЫ И КЛЮЧИ</span><span>© 2026 Ex13m · составил Таймень</span></div>
+  <div class="foot"><span>08 · ЭКРАНЫ И ГОРИЗОНТ</span><span>© 2026 Ex13m · составил Таймень</span></div>
 </div>
 
 </body>
