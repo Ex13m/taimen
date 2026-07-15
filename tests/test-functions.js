@@ -161,6 +161,37 @@ function ev(method, body, ip) {
   assert.ok(JSON.parse(r.body).error.includes('споткнулся'), 'человеческий текст ошибки');
   delete process.env.REPLICATE_API_TOKEN;
 
+  // руки Тайменя: tool loop — мозг просит ask_planet, планета отвечает, финал с trace
+  process.env.ANTHROPIC_API_KEY = 'sk-test';
+  const seq = [];
+  global.fetch = async (url, opts) => {
+    const b = JSON.parse(opts.body);
+    seq.push({ url, tools: !!b.tools, model: b.model });
+    if (b.system && b.system.indexOf('Стратегорум') === 0)
+      return { ok: true, status: 200, json: async () => ({ model: 'claude-sonnet-5',
+        content: [{ type: 'text', text: 'План: три шага.' }], usage: { input_tokens: 5, output_tokens: 5 } }) };
+    if (seq.filter(s => s.tools).length === 1 && b.messages.length === 1)
+      return { ok: true, status: 200, json: async () => ({ model: 'claude-fable-5', stop_reason: 'tool_use',
+        content: [{ type: 'tool_use', id: 'tu1', name: 'ask_planet', input: { id: 'strateg', question: 'дай план' } }],
+        usage: { input_tokens: 10, output_tokens: 10 } }) };
+    return { ok: true, status: 200, json: async () => ({ model: 'claude-fable-5', stop_reason: 'end_turn',
+      content: [{ type: 'text', text: 'Совет собран: Стратегорум дал три шага. [[mood:focus]]' }],
+      usage: { input_tokens: 20, output_tokens: 15 } }) };
+  };
+  r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'сложная задача' }] }, '10.0.0.40'));
+  assert.equal(r.statusCode, 200, 'tool loop -> 200');
+  const tl = JSON.parse(r.body);
+  assert.ok(tl.text.includes('Совет собран'), 'финальный текст после инструментов');
+  assert.equal(tl.trace.length, 1, 'trace с одним действием');
+  assert.equal(tl.trace[0].tool, 'ask_planet', 'след ask_planet');
+  assert.equal(tl.trace[0].id, 'strateg', 'кому летало посольство');
+  assert.ok(tl.usage.out >= 25, 'usage суммируется по ходам');
+  // свите руки не даются
+  const seqBefore = seq.length;
+  r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'x' }], entity: 'strateg', model: 'claude-opus-4-8' }, '10.0.0.41'));
+  assert.equal(seq[seqBefore].tools, false, 'у свиты нет tools');
+  delete process.env.ANTHROPIC_API_KEY;
+
   // tts: GET -> 405; POST без ключа -> 501 (браузерный голос); с ключом -> audio base64
   r = await tts.handler({ httpMethod: 'GET', headers: {} });
   assert.equal(r.statusCode, 405, 'tts GET -> 405');

@@ -41,6 +41,78 @@ const PRICES = {
   'claude-sonnet-5': [3, 15], 'claude-haiku-4-5': [1, 5],
 };
 
+// ---- Руки Тайменя: инструменты, которыми мозг действует сам ----
+// У функций Netlify открытый интернет — Таймень ходит в сеть и спрашивает
+// планеты без участия хозяина. Цикл ограничен и посчитан в бюджет.
+const TOOL_ROUNDS_MAX = 4;
+const TOOLS = [
+  {
+    name: 'fetch_url',
+    description: 'Прочитать страницу по HTTPS-URL и получить её текст (до 20КБ). Используй, когда нужны свежие сведения из сети: новости, документация, статьи.',
+    input_schema: { type: 'object', properties: { url: { type: 'string', description: 'https://…' } }, required: ['url'] },
+  },
+  {
+    name: 'ask_planet',
+    description: 'Задать вопрос планете-агенту галактики и получить её ответ. id: strateg (замысел/план), taktik (ходы/сроки), analitik (числа/разбор), pisar (тексты), hranitel (память), progressor (развитие/этика), bank (финансы), shpion (разведка), immortal (долголетие).',
+    input_schema: { type: 'object', properties: {
+      id: { type: 'string' }, question: { type: 'string' } }, required: ['id', 'question'] },
+  },
+];
+// короткие серверные характеры планет для ask_planet (исполнители — Sonnet 5)
+const PLANET_SYS = {
+  strateg: 'Ты — Стратегорум, планета замысла. Дай план: шаги, развилки, риски. Кратко, по-русски.',
+  taktik: 'Ты — Тактикорум, планета манёвра. Преврати замысел в ходы: ход → срок → критерий готовности. Кратко, по-русски.',
+  analitik: 'Ты — Аналитикум, планета данных. Разбери по числам и логике, покажи вывод. Кратко, по-русски.',
+  pisar: 'Ты — Скрипторум, планета текстов. Дай готовый живой текст. По-русски.',
+  hranitel: 'Ты — Кустодес, планета памяти. Скажи, что стоит запомнить и как это связано с прошлым. Кратко, по-русски.',
+  progressor: 'Ты — Прогрессорум, планета мягкого развития (Третий Путь Стругацких). Предложи следующий разумный шаг, взвесь цену вмешательства. По-русски.',
+  bank: 'Ты — Фискаторум, планета-казна. Посчитай деньги/ресурсы, предупреди о перерасходе. Кратко, цифрами, по-русски.',
+  shpion: 'Ты — Спекулятор, планета разведки. Скажи, где искать сведения и что проверить, с оговоркой о надёжности. Кратко, по-русски.',
+  immortal: 'Ты — Иммортис, планета отсчёта до бессмертия. Оцени с позиции продления жизни, честно про неопределённость. Кратко, по-русски.',
+};
+
+async function toolFetchUrl(rawUrl){
+  let u;
+  try { u = new URL(String(rawUrl)); } catch { return 'ошибка: некорректный URL'; }
+  if (u.protocol !== 'https:') return 'ошибка: только https';
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const res = await fetch(u.href, { signal: ctl.signal, redirect: 'follow',
+      headers: { 'user-agent': 'TaimenGalaxy/1.0 (+taimen)' } });
+    const raw = (await res.text()).slice(0, 300000);
+    // грубое извлечение текста: режем скрипты/стили/теги, схлопываем пробелы
+    const text = raw
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&[a-z#0-9]+;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 20000);
+    return 'HTTP ' + res.status + ' · ' + u.hostname + '\n' + (text || '(пусто)');
+  } catch (e) {
+    return 'ошибка сети: ' + ((e && e.name === 'AbortError') ? 'таймаут' : (e && e.message) || '?');
+  } finally { clearTimeout(timer); }
+}
+
+async function toolAskPlanet(apiKey, id, question, addCost){
+  const sys = PLANET_SYS[id];
+  if (!sys) return 'ошибка: нет такой планеты (' + id + ')';
+  try {
+    const res = await fetch(ANTHROPIC_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': API_VERSION },
+      body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 700, system: sys,
+        messages: [{ role: 'user', content: String(question).slice(0, 4000) }] }),
+    });
+    const data = await res.json();
+    if (!res.ok) return 'планета молчит (' + res.status + ')';
+    if (data.usage) addCost('claude-sonnet-5', data.usage);
+    return (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim() || '(тишина)';
+  } catch { return 'планета недоступна'; }
+}
+
 // Ограничитель в памяти инстанса функции. Не переживает холодный старт —
 // «мягкий» лимит, достаточный для v1 (жёсткий вариант — TODO.md).
 const lastHit = new Map(); // ip -> ts
@@ -244,60 +316,93 @@ exports.handler = async (event) => {
 
   try {
     const isFable = model === 'claude-fable-5';
-    const res = await fetch(ANTHROPIC_URL, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': API_VERSION,
-        // серверный фолбэк: если классификаторы Fable отказали — тот же запрос
-        // дослуживает Opus 4.8 внутри того же вызова
-        ...(isFable ? { 'anthropic-beta': 'server-side-fallback-2026-06-01' } : {}),
-      },
-      body: JSON.stringify({
-        model, max_tokens: maxTokens, system, messages,
-        ...(isFable ? { fallbacks: [{ model: FABLE_FALLBACK }] } : {}),
-      }),
-    });
+    // руки даём только главному разуму (не свите): body.tools !== false
+    const handsOn = body.tools !== false && !body.entity;
+    const addCost = (m, u) => {
+      const p = PRICES[m] || [5, 25];
+      daily.cost += (((u.input_tokens || u.in || 0) * p[0]) + ((u.output_tokens || u.out || 0) * p[1])) / 1e6;
+    };
+    const trace = []; // след действий: фронт покажет ракеты и пометки
+    const convo = messages.map((m) => ({ role: m.role, content: m.content }));
+    let usage = { in: 0, out: 0 };
+    let data = null;
 
-    if (!res.ok) {
-      let detail = '';
-      try {
-        detail = ((await res.json()).error || {}).message || '';
-      } catch { /* ignore */ }
-      console.error('anthropic error', res.status, detail);
-      // основной мозг недоступен (не наша ошибка запроса) — пробуем запасной
-      if (res.status === 401 || res.status === 429 || res.status >= 500) {
-        const backup = await viaBackup();
-        if (backup) return backup;
+    for (let round = 0; round <= TOOL_ROUNDS_MAX; round++) {
+      const res = await fetch(ANTHROPIC_URL, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': API_VERSION,
+          // серверный фолбэк: если классификаторы Fable отказали — тот же запрос
+          // дослуживает Opus 4.8 внутри того же вызова
+          ...(isFable ? { 'anthropic-beta': 'server-side-fallback-2026-06-01' } : {}),
+        },
+        body: JSON.stringify({
+          model, max_tokens: maxTokens, system, messages: convo,
+          ...(handsOn ? { tools: TOOLS } : {}),
+          ...(isFable ? { fallbacks: [{ model: FABLE_FALLBACK }] } : {}),
+        }),
+      });
+
+      if (!res.ok) {
+        let detail = '';
+        try { detail = ((await res.json()).error || {}).message || ''; } catch { /* ignore */ }
+        console.error('anthropic error', res.status, detail);
+        // основной мозг недоступен (не наша ошибка запроса) — пробуем запасной
+        if (res.status === 401 || res.status === 429 || res.status >= 500) {
+          const backup = await viaBackup();
+          if (backup) return backup;
+        }
+        const friendly =
+          res.status === 429 ? 'Слишком много мыслей сразу. Попробуй через минуту.'
+          : res.status === 401 ? 'Ключ не подошёл. Проверь ANTHROPIC_API_KEY.'
+          : res.status >= 500 ? 'Глубины сейчас неспокойны. Попробуй ещё раз.'
+          : 'Не получилось подумать. Попробуй переформулировать.';
+        return json(res.status === 429 ? 429 : 502, { error: friendly });
       }
-      const friendly =
-        res.status === 429 ? 'Слишком много мыслей сразу. Попробуй через минуту.'
-        : res.status === 401 ? 'Ключ не подошёл. Проверь ANTHROPIC_API_KEY.'
-        : res.status >= 500 ? 'Глубины сейчас неспокойны. Попробуй ещё раз.'
-        : 'Не получилось подумать. Попробуй переформулировать.';
-      return json(res.status === 429 ? 429 : 502, { error: friendly });
+
+      data = await res.json();
+      if (data.usage) {
+        usage.in += data.usage.input_tokens || 0;
+        usage.out += data.usage.output_tokens || 0;
+        addCost(data.model || model, data.usage);
+      }
+
+      const toolUses = (data.content || []).filter((b) => b.type === 'tool_use');
+      if (data.stop_reason !== 'tool_use' || !toolUses.length || round === TOOL_ROUNDS_MAX) break;
+
+      // исполняем инструменты и возвращаем результаты в разговор
+      convo.push({ role: 'assistant', content: data.content });
+      const results = [];
+      for (const tu of toolUses) {
+        let out;
+        if (tu.name === 'fetch_url') {
+          out = await toolFetchUrl(tu.input && tu.input.url);
+          trace.push({ tool: 'fetch_url', url: String((tu.input && tu.input.url) || '').slice(0, 200) });
+        } else if (tu.name === 'ask_planet') {
+          const pid = String((tu.input && tu.input.id) || '');
+          out = await toolAskPlanet(apiKey, pid, (tu.input && tu.input.question) || '', addCost);
+          trace.push({ tool: 'ask_planet', id: pid, q: String((tu.input && tu.input.question) || '').slice(0, 120) });
+        } else {
+          out = 'неизвестный инструмент';
+        }
+        results.push({ type: 'tool_result', tool_use_id: tu.id, content: String(out).slice(0, 24000) });
+      }
+      convo.push({ role: 'user', content: results });
     }
 
-    const data = await res.json();
-    const usage = data.usage
-      ? { in: data.usage.input_tokens || 0, out: data.usage.output_tokens || 0 }
-      : null;
-    if (usage) {
-      const p = PRICES[data.model] || PRICES[model] || [5, 25];
-      daily.cost += (usage.in * p[0] + usage.out * p[1]) / 1e6;
-    }
     const costLimit2 = parseFloat(process.env.DAILY_COST_LIMIT) || 5;
     const budget = { spent: Math.round(daily.cost * 100) / 100, limit: costLimit2 };
     if (data.stop_reason === 'refusal') {
-      return json(200, { text: 'Об этом я говорить не стану — спроси иначе.', usage, model: data.model || model, budget });
+      return json(200, { text: 'Об этом я говорить не стану — спроси иначе.', usage, model: data.model || model, budget, trace });
     }
     const text = (data.content || [])
       .filter((b) => b.type === 'text')
       .map((b) => b.text)
       .join('\n')
       .trim();
-    return json(200, { text, usage, model: data.model || model, budget });
+    return json(200, { text, usage, model: data.model || model, budget, trace });
   } catch (e) {
     console.error('proxy failure', e && e.message);
     const backup = await viaBackup();
