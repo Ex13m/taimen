@@ -196,6 +196,24 @@
   @keyframes gspin{ to{ transform: rotate(360deg) } }
   @media (max-width: 700px){ #gauge{ font-size: 10px; bottom: 38vh; } }
 
+  /* журнал вселенной: мелкие действия агентов бегут сверху вниз справа */
+  #agentlog{
+    position: fixed; right: calc(12px + env(safe-area-inset-right)); top: 15vh;
+    width: 200px; max-width: 44vw; z-index: 4; pointer-events: none; text-align: right;
+    font: 9.5px/1.5 "Consolas", "Menlo", monospace; letter-spacing: .02em;
+  }
+  #agentlog .al{
+    color: rgba(150, 205, 255, .72); text-shadow: 0 0 8px rgba(60, 120, 220, .5);
+    margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    opacity: 0; transform: translateY(-4px); animation: alin .38s ease forwards;
+  }
+  @keyframes alin{ to{ opacity: 1; transform: none; } }
+  #agentlog .al.dim{ opacity: .32; }
+  #agentlog .al b{ color: #b7e8ff; font-weight: 400; }
+  #agentlog .al .t{ color: rgba(140,220,255,.4); }
+  body.zen #agentlog{ opacity: .12; }
+  @media (max-width: 700px){ #agentlog{ font-size: 8.5px; width: 156px; top: 13vh; } }
+
   /* инфо-экран орба (двойной тап) */
   #infocard{
     position: fixed; right: calc(16px + env(safe-area-inset-right)); top: 50%;
@@ -307,7 +325,7 @@
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · щипок — ближе · тап по шару — слово ему · долгий тап — его орбита в руках</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.16.0 · © 2026 Ex13m</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.17.0 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -347,6 +365,7 @@
 <div id="drop">отпусти — Таймень проглотит</div>
 <div id="hearing"></div>
 <div id="gauge"></div>
+<div id="agentlog" title="журнал вселенной"></div>
 <div id="helm" title="штурвал: прижми и веди"></div>
 <div id="orbtune" class="glass"><div id="ot-t">ОРБИТА</div><div class="bar"><i id="ot-m"></i></div><div id="ot-hint">тяни ↑ шире · ↓ уже · отпусти — запомню</div></div>
 <div id="infocard" class="glass"></div>
@@ -361,12 +380,11 @@
    ========================================================= */
 
 const MAXO = 12;
-const APP_VERSION = '1.16.0';
+const APP_VERSION = '1.17.0';
 const WHATS_NEW = [
-  '🦾 у Тайменя появились РУКИ: он сам ходит в сеть (читает страницы) и сам спрашивает планеты — смотри ракеты-посольства и пометки 🌐/🪐 в чате',
-  'настоящая кооперация: на сложный вопрос Таймень собирает совет — Стратегорум даёт план, Тактикорум ходы, профильные планеты своё — и сводит в одно решение',
+  '📜 журнал вселенной: мелким шрифтом справа сверху вниз бегут действия — кто родился, кто кому шлёт посольство, что спросил Таймень, куда сходил в сеть, что запомнил',
+  '🦾 руки Тайменя (было в 1.16): сам ходит в сеть и сам созывает совет планет — теперь это видно и в журнале, и ракетами',
   '⚔ титулы цивилизации у всех планет; ТАКТИКОРУМ — начальник Прогрессорума',
-  'щипок больше не зумит страницу — модалки не уезжают за экран',
 ];
 
 /* ---------- Шейдеры ---------- */
@@ -804,6 +822,22 @@ function say(role, text, cls){
   logEl.scrollTop = logEl.scrollHeight;
   while (logEl.children.length > 60) logEl.removeChild(logEl.firstChild);
 }
+// журнал вселенной: краткие действия агентов, новые сверху, старые тускнеют
+let alTimer = null;
+function logAct(html){
+  const el = $('agentlog'); if (!el) return;
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0'), mm = String(now.getMinutes()).padStart(2, '0'), ss = String(now.getSeconds()).padStart(2, '0');
+  const d = document.createElement('div'); d.className = 'al';
+  d.innerHTML = '<span class="t">' + hh + ':' + mm + ':' + ss + '</span> ' + html;
+  el.insertBefore(d, el.firstChild);
+  [...el.children].forEach((c, i) => c.classList.toggle('dim', i >= 3));
+  while (el.children.length > 10) el.removeChild(el.lastChild);
+  // самые старые растворяются со временем даже без новых событий
+  clearTimeout(alTimer);
+  alTimer = setTimeout(() => { const l = el.lastChild; if (l && el.children.length > 3) l.remove(); }, 9000);
+}
+function nameByEnt(id){ return id === 'main' ? 'ТАЙМЕНЬ' : (ENTITIES[id] ? ENTITIES[id].name : id); }
 function setStatus(state){
   S.state = state;
   const words = { idle:'дремлет', listening:'слушаю', thinking:'думает', speaking:'говорит' };
@@ -812,6 +846,10 @@ function setStatus(state){
   const dot = $('status-dot');
   dot.style.background = colors[state]; dot.style.boxShadow = '0 0 8px ' + colors[state];
   $('moodword').textContent = '· ' + S.mood.w;
+  const who = S.activeEntity ? nameByEnt(S.activeEntity) : 'ТАЙМЕНЬ';
+  if (state === 'thinking') logAct('◌ <b>' + who + '</b> размышляет');
+  else if (state === 'speaking') logAct('◈ <b>' + who + '</b> отвечает');
+  else if (state === 'listening') logAct('🎙 слушает хозяина');
 }
 
 /* ---------- Кельтские сигилы (атлас-текстура) ---------- */
@@ -967,6 +1005,7 @@ function spawnOrb(entId, parentIdx, level){
   orbs.push(o);
   ensureLabel(o);
   if (S.booted) setTimeout(tearSound, 1800); // тягучка рвётся, когда шейка визуально лопается
+  logAct('🌱 колония: родилась <b>' + ENTITIES[entId].name + '</b>');
   return o;
 }
 function orbIdxByEnt(entId){ return orbs.findIndex(o => o.entId === entId); }
@@ -1495,6 +1534,7 @@ function launchRocket(fromEnt, toEnt, what){
   rockets.push({ a, b: bI, e: 0, dur: 2.6 + Math.random()*0.8,
     side: Math.random() < 0.5 ? 1 : -1, lift: 0.3 + Math.random()*0.5, trail: [],
     label: nameOf(a) + ' → ' + nameOf(bI) + (what ? ' · ' + what : ''), arrived: false });
+  logAct('🚀 <b>' + nameOf(a) + '</b>→<b>' + nameOf(bI) + '</b>' + (what ? ' · ' + what : ''));
 }
 const fxCv = $('fx');
 const fxCtx = fxCv ? fxCv.getContext('2d') : null;
@@ -1606,6 +1646,7 @@ function toggleEntity(id){
     $('active-entity').style.display = 'none';
     focusOrb(0);
     launchRocket(id, 'main', 'вернул слово');
+    logAct('◈ слово вернулось <b>ТАЙМЕНЮ</b>');
     say('sys', '↩ снова говорит сам Таймень');
   } else {
     if (S.activeEntity){ const p = $('ent-' + S.activeEntity); if (p) p.classList.remove('active'); }
@@ -1617,6 +1658,7 @@ function toggleEntity(id){
     if (idx > 0) focusOrb(idx);
     launchRocket('main', id, 'передал слово');
     if (idx >= 0){ const pp = project(camBasis(), orbs[idx].pos); if (pp) burstVortex(pp.x, pp.y, orbHue(idx), 40); } // вихрь пробуждения
+    logAct('◈ пробудилась <b>' + ENTITIES[id].name + '</b>');
     say('sys', '◈ ' + ENTITIES[id].name + ' слушает (' + ENTITIES[id].hint + ')');
   }
 }
@@ -1728,6 +1770,7 @@ async function loadMemory(){
         if (j.data.scout){
           S._scout = j.data.scout; // не перетирать труды разведчика при записи
           if (j.data.scout.lastReport && j.data.scout.lastRun > (parseInt(localStorage.getItem('taimen-scout-seen') || '0', 10))){
+            logAct('🕵 Спекулятор: доклад разведки');
             say('sys', '🕵 ' + j.data.scout.lastReport + ' — журнал в окне Иммортала');
             try { localStorage.setItem('taimen-scout-seen', String(j.data.scout.lastRun)); } catch { /* ok */ }
           }
@@ -1845,10 +1888,12 @@ async function callBrain(messages, opts){
           launchRocket('main', t.id, 'вопрос');
           setTimeout(() => launchRocket(t.id, 'main', 'ответ'), 1700);
         }, k * 600);
+        logAct('🪐 совет: спросил <b>' + ENTITIES[t.id].name + '</b>');
         say('sys', '🪐 Таймень спросил ' + ENTITIES[t.id].name + (t.q ? ': ' + t.q : ''));
       } else if (t.tool === 'fetch_url'){
         let host = t.url || '';
         try { host = new URL(t.url).hostname; } catch { /* как есть */ }
+        logAct('🌐 сеть: <b>' + host + '</b>');
         say('sys', '🌐 Таймень сходил в сеть: ' + host);
       }
     });
@@ -1938,6 +1983,7 @@ async function sendMessage(text){
       if (!S.notes.some(n => n.toLowerCase() === note.toLowerCase())){
         S.notes.push(note);
         launchRocket('main', 'hranitel', 'заметка в память');
+        logAct('⛬ Кустодес: записал в память');
         say('sys', '⛬ запомнил: ' + note);
       }
     }
@@ -1946,6 +1992,7 @@ async function sendMessage(text){
     for (const rule of p.rules){
       if (!S.rules.some(r => r.toLowerCase() === rule.toLowerCase())){
         S.rules.push(rule);
+        logAct('⚜ принял правило хозяина');
         say('sys', '⚜ принял правило: ' + rule);
       }
     }
@@ -1955,6 +2002,7 @@ async function sendMessage(text){
       if (!S.wishes.some(x => x.text.toLowerCase() === w.toLowerCase())){
         S.wishes.push({ text: w, ts: Date.now() });
         launchRocket('main', 'strateg', 'пожелание в книгу');
+        logAct('☆ в книгу пожеланий · ночной мастер');
         say('sys', '☆ в книгу пожеланий: ' + w + ' — ночной мастер возьмётся');
       }
     }
