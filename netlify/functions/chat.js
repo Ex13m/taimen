@@ -27,10 +27,17 @@ const MIN_INTERVAL_MS = 2000; // >=2с между запросами с одно
 //    (пометка :free — $0 за токены), ключ OPENROUTER_API_KEY;
 //  · Replicate (replicate.com) — открытые модели за копейки, REPLICATE_API_TOKEN.
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+// Пайплайн: цепочка моделей — OpenRouter сам перебирает по списку, если одна
+// недоступна/лимитирована (нативный фолбэк через поле models[]). Первым — выбор
+// хозяина (OPENROUTER_MODEL), дальше — крепкие бесплатные, хорошо знающие русский.
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat-v3-0324:free';
+const OPENROUTER_CHAIN = (process.env.OPENROUTER_MODELS ||
+  'deepseek/deepseek-chat-v3-0324:free,meta-llama/llama-3.3-70b-instruct:free,qwen/qwen-2.5-72b-instruct:free,google/gemini-2.0-flash-exp:free,mistralai/mistral-small-3.1-24b-instruct:free'
+).split(',').map((s) => s.trim()).filter(Boolean);
 // не-:free модель OpenRouter тоже учитываем в бюджете — консервативно ($/млн),
 // чтобы платная модель не молотила мимо дневной отсечки
 const OPENROUTER_PRICE = (process.env.OPENROUTER_PRICE || '3,15').split(',').map(Number);
+const SITE_URL = process.env.URL || process.env.DEPLOY_URL || 'https://taimen-orb.netlify.app';
 const REPLICATE_URL = 'https://api.replicate.com/v1/models/';
 const REPLICATE_MODEL = process.env.REPLICATE_MODEL || 'meta/meta-llama-3-70b-instruct';
 const REPLICATE_PRICE = (process.env.REPLICATE_PRICE || '0.65,2.75').split(',').map(Number); // $/млн (дефолт llama-3-70b)
@@ -181,38 +188,54 @@ function clientIp(event) {
   );
 }
 
-// Запасной мозг №1: OpenRouter — обычный chat-формат, бесплатные :free модели.
+// Запасной мозг №1: OpenRouter — chat-формат, цепочка бесплатных моделей с
+// нативным авто-фолбэком (models[]) + атрибуция (лучший бесплатный лимит).
 async function askOpenRouter(messages, system, maxTokens) {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) return null;
-  const res = await fetch(OPENROUTER_URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key },
-    body: JSON.stringify({
-      model: OPENROUTER_MODEL,
-      max_tokens: maxTokens,
-      messages: [
-        ...(system ? [{ role: 'system', content: system }] : []),
-        ...messages,
-      ],
-    }),
-  });
+  // первым — выбранная модель, затем остальная цепочка (без дублей)
+  const models = [OPENROUTER_MODEL, ...OPENROUTER_CHAIN].filter((m, i, a) => a.indexOf(m) === i);
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 9000);
+  let res;
+  try {
+    res = await fetch(OPENROUTER_URL, {
+      method: 'POST', signal: ctl.signal,
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer ' + key,
+        'HTTP-Referer': SITE_URL,   // атрибуция OpenRouter — щедрее бесплатный лимит
+        'X-Title': 'TAIMEN',
+      },
+      body: JSON.stringify({
+        models,                      // цепочка: OpenRouter сам перебирает при отказе
+        max_tokens: maxTokens,
+        provider: { allow_fallbacks: true, data_collection: 'deny' },
+        messages: [
+          ...(system ? [{ role: 'system', content: system }] : []),
+          ...messages,
+        ],
+      }),
+    });
+  } catch (e) { clearTimeout(timer); return { error: (e && e.name === 'AbortError') ? 'Запасной мозг долго думал.' : 'Запасной мозг недоступен.' }; }
+  clearTimeout(timer);
   if (!res.ok) {
     let detail = '';
     try { detail = (((await res.json()).error || {}).message || ''); } catch { /* ignore */ }
     console.error('openrouter error', res.status, detail);
     return { error:
       res.status === 401 || res.status === 402 ? 'Запасной мозг: ключ OpenRouter не подошёл или кончился баланс.'
-      : res.status === 429 ? 'Запасной мозг: дневной лимит бесплатной модели. Попробуй позже.'
+      : res.status === 429 ? 'Запасной мозг: все бесплатные модели заняты. Попробуй позже.'
       : 'Запасной мозг сейчас недоступен. Попробуй ещё раз.' };
   }
   const data = await res.json();
+  const usedModel = data.model || OPENROUTER_MODEL; // OpenRouter вернёт, кто реально ответил
   const text = ((((data.choices || [])[0] || {}).message || {}).content || '').trim();
   if (!text) return { error: 'Запасной мозг промолчал. Попробуй ещё раз.' };
   const u = data.usage || {};
   const usage = { in: u.prompt_tokens || 0, out: u.completion_tokens || 0 };
-  const free = OPENROUTER_MODEL.endsWith(':free');
-  return { text, usage, model: 'openrouter/' + (data.model || OPENROUTER_MODEL),
+  const free = String(usedModel).endsWith(':free');
+  return { text, usage, model: 'openrouter/' + usedModel,
     cost: free ? 0 : (usage.in * OPENROUTER_PRICE[0] + usage.out * OPENROUTER_PRICE[1]) / 1e6 };
 }
 
@@ -355,6 +378,14 @@ exports.handler = async (event) => {
     return json(200, { text: r.text, usage: r.usage, model: r.model,
       budget: { spent: Math.round(daily.cost * 100) / 100, limit: lim } });
   };
+
+  // health-check запасного мозга: гоняет ТОЛЬКО запаску (OpenRouter/Replicate),
+  // минуя Anthropic — чтобы проверить, что OpenRouter реально отвечает.
+  if (body.diag === 'backup') {
+    const b = await viaBackup();
+    if (b) return b;
+    return json(503, { error: 'Запасной мозг не настроен: нет OPENROUTER_API_KEY / REPLICATE_API_TOKEN.' });
+  }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {

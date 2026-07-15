@@ -1,5 +1,17 @@
 # История версий
 
+## v1.19.0 — 2026-07-15 · пайплайн OpenRouter
+
+- Запасной мозг №1 переведён на цепочку моделей (нативный фолбэк OpenRouter
+  через поле models[]): OPENROUTER_MODEL первым, дальше крепкие бесплатные,
+  знающие русский — llama-3.3-70b, qwen-2.5-72b, gemini-2.0-flash, mistral-small
+  (все :free). Переопределяется OPENROUTER_MODELS. Заголовки атрибуции
+  HTTP-Referer + X-Title (щедрее бесплатный лимит), provider allow_fallbacks +
+  data_collection:deny, таймаут 9с. Модель в ответе — та, что реально ответила.
+- Health-check запасного мозга: POST {diag:"backup"} гоняет только запаску,
+  минуя Anthropic — доказывает, что OpenRouter отвечает. Workflow ping-brain
+  проверяет и основной, и запасной мозг, пишет вердикт в docs/ops/.
+
 ## v1.18.1 — 2026-07-15 · доводка этапа 0 (по мультиагентному ревью)
 
 - 504 закрыт до конца: КАЖДЫЙ вызов Anthropic (главный цикл + ask_planet)

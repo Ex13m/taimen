@@ -23,36 +23,44 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: постучаться в мозг
+      - name: постучаться в мозг (основной + запасной)
         run: |
           SITE="${{ inputs.site }}"
           [ -z "$SITE" ] && SITE="$(head -n1 docs/ops/ping.txt 2>/dev/null | tr -d '[:space:]')"
           [ -z "$SITE" ] && SITE="https://taimen-orb.netlify.app"
           echo "сайт: $SITE"
           mkdir -p docs/ops
+          # 1) обычный запрос — кто отвечает по умолчанию
           code=$(curl -s -o docs/ops/brain-ping.json -w "%{http_code}" \
-            -X POST "$SITE/api/chat" \
-            -H "content-type: application/json" \
+            -X POST "$SITE/api/chat" -H "content-type: application/json" \
             --data '{"messages":[{"role":"user","content":"ответь одним словом: привет"}]}' || echo 000)
-          echo "HTTP $code"
-          # достаём поле model и статус в отдельный краткий файл
           model=$(grep -o '"model":"[^"]*"' docs/ops/brain-ping.json | head -n1 | cut -d'"' -f4)
-          err=$(grep -o '"error":"[^"]*"' docs/ops/brain-ping.json | head -n1 | cut -d'"' -f4)
+          # 2) health-check ЗАПАСНОГО мозга напрямую (diag:backup) — доказать OpenRouter
+          sleep 3
+          bcode=$(curl -s -o docs/ops/brain-backup.json -w "%{http_code}" \
+            -X POST "$SITE/api/chat" -H "content-type: application/json" \
+            --data '{"diag":"backup","messages":[{"role":"user","content":"ответь одним словом: привет"}]}' || echo 000)
+          bmodel=$(grep -o '"model":"[^"]*"' docs/ops/brain-backup.json | head -n1 | cut -d'"' -f4)
+          berr=$(grep -o '"error":"[^"]*"' docs/ops/brain-backup.json | head -n1 | cut -d'"' -f4)
           {
-            echo "проверка мозга: HTTP $code"
-            echo "модель ответа: ${model:-—}"
-            [ -n "$err" ] && echo "ошибка: $err"
-            if echo "$model" | grep -qi openrouter; then echo "ВЕРДИКТ: отвечает OpenRouter (запасной мозг) ✓";
-            elif echo "$model" | grep -qi claude; then echo "ВЕРДИКТ: отвечает Anthropic (основной); OpenRouter в резерве";
-            elif echo "$model" | grep -qi replicate; then echo "ВЕРДИКТ: отвечает Replicate (запасной №2)";
-            elif [ -n "$err" ]; then echo "ВЕРДИКТ: мозг не ответил — $err";
-            else echo "ВЕРДИКТ: неясно, см. brain-ping.json"; fi
+            echo "=== ОСНОВНОЙ ==="
+            echo "HTTP $code · модель: ${model:-—}"
+            if echo "$model" | grep -qi openrouter; then echo "→ по умолчанию отвечает OpenRouter";
+            elif echo "$model" | grep -qi claude; then echo "→ по умолчанию отвечает Anthropic (норма)"; fi
+            echo ""
+            echo "=== ЗАПАСНОЙ (OpenRouter/Replicate) ==="
+            echo "HTTP $bcode · модель: ${bmodel:-—}"
+            [ -n "$berr" ] && echo "ошибка: $berr"
+            if echo "$bmodel" | grep -qi openrouter; then echo "ВЕРДИКТ: OpenRouter РАБОТАЕТ ✓ (ответил $bmodel)";
+            elif echo "$bmodel" | grep -qi replicate; then echo "ВЕРДИКТ: OpenRouter молчит, но Replicate работает";
+            elif [ -n "$berr" ]; then echo "ВЕРДИКТ: запасной мозг НЕ работает — $berr";
+            else echo "ВЕРДИКТ: неясно, см. brain-backup.json"; fi
           } > docs/ops/brain-verdict.txt
           cat docs/ops/brain-verdict.txt
       - name: закоммитить результат
         run: |
           git config user.name "taimen-ping"
           git config user.email "ping@taimen.local"
-          git add docs/ops/brain-ping.json docs/ops/brain-verdict.txt
+          git add docs/ops/brain-ping.json docs/ops/brain-backup.json docs/ops/brain-verdict.txt
           git commit -m "ping: проверка мозга [skip ci]" || exit 0
           git push
