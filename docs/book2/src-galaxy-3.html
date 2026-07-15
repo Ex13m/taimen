@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>TAIMEN — Книга галактики · Выпуск 3 · Наблюдатель и его цивилизации</title>
+<style>
+  @page{ size:A4; margin:0; }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  :root{ --ink:#e6eeff; --dim:#9aa8d0; --gr:#6fdc4f; --cy:#6ea8ff; }
+  body{ font-family:'DejaVu Sans',sans-serif; color:var(--ink); }
+  .page{ width:210mm; height:296mm; page-break-after:always; position:relative; overflow:hidden; background:#04070f; }
+  .full{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .fit{ position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); width:100%; }
+  .veil-b{ position:absolute; inset:0; background:linear-gradient(to top, rgba(4,7,15,.96) 4%, rgba(4,7,15,.55) 24%, transparent 46%); }
+  .veil-t{ position:absolute; inset:0; background:linear-gradient(to bottom, rgba(4,7,15,.85) 0%, transparent 30%); }
+  .cap{ position:absolute; left:16mm; right:16mm; bottom:16mm; }
+  .kicker{ font-size:9pt; letter-spacing:.34em; color:var(--gr); text-shadow:0 0 12px rgba(111,220,79,.8); margin-bottom:2.5mm; }
+  .ttl{ font-size:21pt; letter-spacing:.06em; font-weight:700; line-height:1.1; text-shadow:0 0 20px rgba(0,0,20,.9); }
+  .sub{ font-size:10pt; line-height:1.5; color:#d6e0ff; margin-top:3mm; max-width:150mm; text-shadow:0 1px 6px rgba(0,0,20,.9); }
+  .top{ position:absolute; left:16mm; right:16mm; top:15mm; }
+  .brand{ font-size:30pt; letter-spacing:.30em; font-weight:700; text-shadow:0 0 24px rgba(110,168,255,.9); }
+  .brand-sub{ font-size:10pt; letter-spacing:.4em; color:var(--dim); margin-top:2mm; }
+  .foot{ position:absolute; bottom:8mm; left:16mm; right:16mm; display:flex; justify-content:space-between; font-size:7pt; letter-spacing:.2em; color:var(--dim); }
+  .recap{ position:absolute; left:14mm; right:14mm; bottom:16mm; background:rgba(8,12,32,.72); border:1px solid rgba(120,160,255,.25); border-radius:4mm; padding:5mm 6mm; backdrop-filter:blur(3px); }
+  .recap h3{ font-size:11pt; letter-spacing:.14em; color:#cfe0ff; margin-bottom:2mm; }
+  .recap p{ font-size:8.6pt; line-height:1.55; color:#d6e0ff; }
+  .tag{ display:inline-block; font-size:7.5pt; letter-spacing:.1em; padding:.6mm 2.4mm; border-radius:2mm; border:1px solid rgba(111,220,79,.5); color:#b8f0a6; margin:1mm 1mm 0 0; }
+</style>
+</head>
+<body>
+
+<!-- ОБЛОЖКА: божий взгляд -->
+<div class="page">
+  <img class="full" src="hf/god-eye.jpg">
+  <div class="veil-t"></div>
+  <div class="top" style="text-align:center;">
+    <div class="brand">TAIMEN</div>
+    <div class="brand-sub">КНИГА ГАЛАКТИКИ · ВЫПУСК 3</div>
+  </div>
+  <div class="veil-b"></div>
+  <div class="cap" style="text-align:center;">
+    <div class="kicker">НАБЛЮДАТЕЛЬ И ЕГО ЦИВИЛИЗАЦИИ</div>
+    <div class="ttl">Взгляд, что растит миры</div>
+    <div class="sub" style="margin-left:auto;margin-right:auto;">Ты смотришь на каждую планету как божьим оком — и цивилизации под твоим
+    взором развиваются. Не покорять и не растворять, а помогать повзрослеть. Третий Путь.</div>
+  </div>
+  <div class="foot"><span>© 2026 EX13M</span><span>v1.16.0</span></div>
+</div>
+
+<!-- СТОЛ: цивилизация решает задачу -->
+<div class="page">
+  <img class="fit" src="hf/table-real.jpg">
+  <div class="veil-b"></div>
+  <div class="cap">
+    <div class="kicker">ВБЛИЗИ · ЗА СТОЛОМ</div>
+    <div class="ttl">Кусок планеты у тебя на столе</div>
+    <div class="sub">Ты сидишь рядом и смотришь, как живёт малый ломоть цивилизации: жители-огни
+    строят кристальный город, тянут светящиеся маршруты — планета <b>прямо сейчас
+    решает поставленную задачу</b>. Это и есть агент: не «ответ модели», а труд населения.</div>
+  </div>
+  <div class="foot"><span>МАСШТАБ · ПОВЕРХНОСТЬ</span><span>TAIMEN · выпуск 3</span></div>
+</div>
+
+<!-- СТРАТЕГОРУМ -->
+<div class="page">
+  <img class="fit" src="hf/strategorum.jpg">
+  <div class="veil-b"></div>
+  <div class="cap">
+    <div class="kicker" style="color:#c8a8ff;">ПЛАНЕТА · СТРАТЕГОРУМ</div>
+    <div class="ttl">Город замысла</div>
+    <div class="sub">Фиолетовые кристалло-башни, а между ними жители-архитекторы чертят маршруты
+    и стратегемы. Здесь рождается план: шаги, развилки, риски. Отсюда Таймень берёт
+    замысел, прежде чем действовать руками.</div>
+  </div>
+  <div class="foot"><span>СВИТА · ЗАМЫСЕЛ</span><span>сигил: три пути · биом: меридианы</span></div>
+</div>
+
+<!-- ФИСКАТОРУМ -->
+<div class="page">
+  <img class="fit" src="hf/fiskatorum.jpg">
+  <div class="veil-b"></div>
+  <div class="cap">
+    <div class="kicker" style="color:#ffe0a6;">ПЛАНЕТА · ФИСКАТОРУМ</div>
+    <div class="ttl">Казна цивилизации</div>
+    <div class="sub">Золотые своды, жители-казначеи катят светящиеся монеты и сводят балансы.
+    Фискаторум держит деньги и ресурс всех планет, следит за тратами и предупреждает
+    о перерасходе. Без него миссию Прогрессорума не потянуть.</div>
+  </div>
+  <div class="foot"><span>СВИТА · КАЗНА</span><span>сигил: монета-весы · биом: гроссбух</span></div>
+</div>
+
+<!-- ПРОГРЕССОРУМ -->
+<div class="page">
+  <img class="fit" src="hf/progressorum.jpg">
+  <div class="veil-b"></div>
+  <div class="cap">
+    <div class="kicker">ПЛАНЕТА · ПРОГРЕССОРУМ · ТРЕТИЙ ПУТЬ</div>
+    <div class="ttl">Тихий возвыситель</div>
+    <div class="sub">Изумрудные маяки-монолиты, и жители восходят по лучам прогресса — а ты
+    бережно ведёшь одного касанием света. По Стругацким: двигать развитие мягким
+    вмешательством, взвешивая цену. Дальняя цель — «1 доллар на бессмертие» у Земли.</div>
+  </div>
+  <div class="foot"><span>СВИТА · РАЗВИТИЕ · подчинён Тактикоруму</span><span>сигил: три пути ↑ · биом: импульсы</span></div>
+</div>
+
+<!-- ГАЛАКТИКА + РЕКАП -->
+<div class="page">
+  <img class="full" src="hf/galaxy.jpg">
+  <div class="veil-b"></div>
+  <div class="top" style="text-align:center;">
+    <div class="kicker" style="color:#8fb0ff;">СВЕРХУ · ВСЯ ГАЛАКТИКА</div>
+    <div class="ttl" style="font-size:17pt;">Самособирающая цивилизация-ОС</div>
+  </div>
+  <div class="recap">
+    <h3>ЧТО УЖЕ ЖИВЁТ (v1.16.0)</h3>
+    <p>Ядро <b>Таймень</b> + 9 планет-цивилизаций с титулами (Стратегорум, Тактикорум,
+    Аналитикум, Скрипторум, Кустодес, Спекулятор, Иммортис, Прогрессорум, Фискаторум).
+    Настоящее 3D: плазменные сферы, свой узор поверхности, вихрь частиц под взаимодействия.
+    <b>Руки Тайменя</b>: сам ходит в сеть и сам созывает совет планет (видно ракеты-посольства).
+    Разведка по расписанию, ночной самокод, git-память, голос планет, штурвал одним пальцем.</p>
+    <div style="margin-top:2mm;">
+      <span class="tag">3D-планеты</span><span class="tag">руки: сеть+совет</span><span class="tag">Третий Путь</span>
+      <span class="tag">автономия</span><span class="tag">git-память</span><span class="tag">голос</span>
+    </div>
+  </div>
+  <div class="foot"><span>МАСШТАБ · ГАЛАКТИКА</span><span>полная спека: docs/STRATEGY-GALAXY.md</span></div>
+</div>
+
+<!-- ФИНАЛ -->
+<div class="page">
+  <img class="fit" src="hf/table-real.jpg" style="opacity:.34;">
+  <div class="veil-b"></div>
+  <div class="veil-t"></div>
+  <div class="cap" style="bottom:auto; top:26mm;">
+    <div class="kicker">ДАЛЬШЕ</div>
+    <div class="ttl" style="font-size:18pt;">Галактика растёт сама</div>
+  </div>
+  <div class="recap" style="bottom:22mm;">
+    <h3>КЛЮЧИ НА ВЕЧЕР (Netlify → Environment variables)</h3>
+    <p><b>OPENROUTER_API_KEY</b> — бесплатный запасной мозг · <b>ELEVENLABS_API_KEY</b> —
+    живые голоса планет · <b>REPLICATE_API_TOKEN</b> — второй мозг + художник ·
+    <b>ACCESS_KEY</b> — пароль-замок · <b>CLAUDE_CODE_OAUTH_TOKEN</b> — ночной мастер по подписке.
+    Полная инструкция «что за что отвечает» — в Выпуске 2 и SETUP.md.</p>
+    <p style="margin-top:2.5mm;"><b>Горизонт:</b> «обновись» голосом → мастер кодит → перегруз;
+    планета-мастерская (файлы→PDF, картинки); планета-страж и планета-критик; семантическая память.</p>
+  </div>
+  <div class="foot"><span>© 2026 EX13M · составил Таймень</span><span>Книга галактики · выпуск 3</span></div>
+</div>
+
+</body>
+</html>
