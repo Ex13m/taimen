@@ -1,0 +1,2554 @@
+<!DOCTYPE html>
+<!-- ТАЙМЕНЬ v1.0.0 · © 2026 Ex13m. Все права защищены. -->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#060318">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>TAIMEN</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%236ea8ff' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff4a3a' stroke-width='5' stroke-dasharray='40 100'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --glass: rgba(10, 14, 34, 0.42);
+    --glass-line: rgba(120, 160, 255, 0.22);
+    --text: #cfe0ff;
+    --dim: #7285b8;
+    --accent: #6ea8ff;
+    --warn: #ff7a6e;
+  }
+  *{ box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body{ height: 100%; overflow: hidden;
+    touch-action: pan-y; overscroll-behavior: none; } /* щипок не зумит страницу — модалки не уезжают */
+  body{
+    font: 15px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: var(--text);
+    background: radial-gradient(120% 90% at 50% 42%, #14104a 0%, #0d0832 40%, #060318 75%, #020108 100%);
+    user-select: none;
+  }
+  canvas#orb{ position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  canvas#orb.drag{ cursor: grabbing; }
+
+  .glass{
+    background: var(--glass);
+    border: 1px solid var(--glass-line);
+    border-radius: 14px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 8px 40px rgba(0,0,10,.45), inset 0 0 30px rgba(90,130,255,.05);
+  }
+
+  /* HUD */
+  #hud{ position: fixed; top: 14px; left: 14px; top: calc(14px + env(safe-area-inset-top)); left: calc(14px + env(safe-area-inset-left)); padding: 12px 16px; z-index: 5; min-width: 180px; }
+  #hud h1{ font-size: 17px; letter-spacing: .35em; font-weight: 600; color: #e6efff; text-shadow: 0 0 18px rgba(110,168,255,.8); }
+  #hud .sub{ font-size: 12px; color: var(--dim); margin-top: 4px; display: flex; gap: 8px; align-items: center; }
+  #status-dot{ width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); transition: background .4s, box-shadow .4s; }
+  #active-entity{ font-size: 11px; margin-top: 6px; color: var(--accent); display: none; }
+  #camhint{ font-size: 10px; margin-top: 6px; color: var(--dim); opacity: .7; }
+
+  #memchip{
+    position: fixed; top: 14px; right: 14px; z-index: 5;
+    top: calc(14px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right));
+    padding: 8px 14px; font-size: 12px; color: var(--dim); cursor: pointer;
+  }
+  #memchip b{ color: var(--text); font-weight: 500; }
+
+  /* подписи орбов в 3D */
+  .entlabel{
+    position: fixed; z-index: 4; transform: translate(-50%, -100%);
+    font-size: 10px; letter-spacing: .22em; color: var(--dim);
+    text-shadow: 0 0 8px rgba(0,0,20,.9); pointer-events: auto; cursor: pointer;
+    padding: 12px 16px; margin: -8px; transition: color .4s, text-shadow .4s; white-space: nowrap;
+    touch-action: manipulation;
+  }
+  .entlabel.suggested{ color: #ffe9b0; text-shadow: 0 0 14px rgba(255,220,140,.9); animation: lblpulse 1.6s infinite; }
+  .entlabel.active{ color: #ffffff; text-shadow: 0 0 16px rgba(160,190,255,1); }
+  .entlabel.lvl2{ font-size: 8px; letter-spacing: .16em; opacity: .85; }
+  @keyframes lblpulse{ 50%{ opacity: .55; } }
+
+  /* Чат */
+  #chat{
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: min(680px, calc(100% - 24px));
+    z-index: 6; padding: 10px 12px 12px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  #log{
+    max-height: 26vh; overflow-y: auto; display: flex; flex-direction: column; gap: 7px;
+    padding: 4px 2px; scrollbar-width: thin; scrollbar-color: rgba(110,168,255,.3) transparent;
+  }
+  .msg{ max-width: 86%; padding: 8px 26px 8px 12px; border-radius: 12px; font-size: 14px;
+    white-space: pre-wrap; user-select: text; -webkit-user-select: text; position: relative; }
+  .msg .copy{ position: absolute; right: 4px; top: 4px; font-size: 12px; line-height: 1;
+    padding: 4px 5px; opacity: .4; cursor: pointer; user-select: none; -webkit-user-select: none; }
+  .msg .copy:active{ opacity: 1; }
+  .msg.user{ align-self: flex-end; background: rgba(110,168,255,.16); border: 1px solid rgba(110,168,255,.25); }
+  .msg.taimen{ align-self: flex-start; background: rgba(30,40,90,.35); border: 1px solid rgba(120,160,255,.14); }
+  .msg.sys{ align-self: center; font-size: 12px; color: var(--dim); background: none; padding: 2px 8px; }
+  .msg.err{ color: var(--warn); }
+  .msg .who{ display: block; font-size: 10px; letter-spacing: .12em; color: var(--dim); margin-bottom: 3px; }
+
+  #inrow{ display: flex; gap: 8px; align-items: center; }
+  #inp{
+    flex: 1; min-width: 0; background: rgba(8,10,26,.6); border: 1px solid var(--glass-line);
+    border-radius: 10px; padding: 10px 12px; color: var(--text); font: inherit; outline: none;
+  }
+  #inp:focus{ border-color: rgba(110,168,255,.55); }
+  .btn{
+    border: 1px solid var(--glass-line); background: rgba(20,28,64,.5); color: var(--text);
+    border-radius: 10px; padding: 9px 12px; cursor: pointer; font: inherit; font-size: 15px;
+    transition: background .2s, border-color .2s, box-shadow .2s;
+  }
+  .btn:hover{ background: rgba(40,55,110,.6); }
+  .btn.on{ border-color: var(--accent); box-shadow: 0 0 14px rgba(110,168,255,.35); }
+  .btn.rec{ border-color: var(--warn); box-shadow: 0 0 16px rgba(255,110,100,.5); animation: recpulse 1.2s infinite; }
+  @keyframes recpulse{ 50%{ box-shadow: 0 0 26px rgba(255,110,100,.8); } }
+
+  /* Знания и память */
+  #knowbtn{ position: fixed; left: 14px; bottom: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 7; }
+  #know{
+    position: fixed; left: 14px; bottom: 68px; bottom: calc(68px + env(safe-area-inset-bottom)); z-index: 7;
+    width: min(340px, calc(100% - 28px)); max-height: 62vh; overflow-y: auto;
+    padding: 14px; display: none; flex-direction: column; gap: 10px;
+  }
+  #know.open{ display: flex; }
+  #know h3{ font-size: 12px; letter-spacing: .2em; color: var(--dim); font-weight: 500; }
+  #know textarea{
+    background: rgba(8,10,26,.6); border: 1px solid var(--glass-line); border-radius: 10px;
+    color: var(--text); font: inherit; font-size: 13px; padding: 8px; min-height: 64px; resize: vertical; outline: none;
+  }
+  .kitem{ font-size: 12px; display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
+    border-bottom: 1px dashed rgba(120,160,255,.12); padding-bottom: 5px; }
+  .kitem .kx{ cursor: pointer; color: var(--dim); padding: 12px 14px; margin: -12px -14px; /* визуально без изменений, тап-зона >=40px */ } .kitem .kx:hover{ color: var(--warn); }
+  .btn, .entlabel, #memchip, .kx, #inp{ touch-action: manipulation; }
+  .note{ font-size: 12px; color: var(--dim); }
+
+  /* Запуск */
+  #boot{
+    position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 26px;
+    background: radial-gradient(100% 100% at 50% 50%, rgba(6,4,26,.55), rgba(3,2,16,.92));
+    backdrop-filter: blur(4px); transition: opacity .9s;
+  }
+  #boot.gone{ opacity: 0; pointer-events: none; }
+  #boot h1{ font-size: 30px; letter-spacing: .5em; font-weight: 300; color: #e6efff; text-shadow: 0 0 40px rgba(110,168,255,.9); padding-left: .5em; }
+  #boot p{ color: var(--dim); font-size: 13px; max-width: 320px; text-align: center; }
+  #start-unused{
+    font-size: 16px; letter-spacing: .3em; padding: 14px 44px 14px 48px; border-radius: 40px;
+    background: rgba(20,28,64,.5); border: 1px solid rgba(110,168,255,.5); color: #e6efff; cursor: pointer;
+    box-shadow: 0 0 30px rgba(110,168,255,.25); transition: box-shadow .3s;
+  }
+  #start:hover{ box-shadow: 0 0 50px rgba(110,168,255,.6); }
+
+  #drop{ position: fixed; inset: 0; z-index: 30; display: none; align-items: center; justify-content: center;
+    background: rgba(10,14,40,.55); font-size: 18px; letter-spacing: .2em; color: #e6efff; border: 2px dashed rgba(110,168,255,.5); }
+  #drop.show{ display: flex; }
+
+  /* дзен: интерфейс растворяется, остаётся живой орб */
+  #hud, #chat, #memchip, #knowbtn, .entlabel{ transition: opacity 1.2s; }
+  body.zen #hud, body.zen #memchip, body.zen #knowbtn, body.zen .entlabel{ opacity: 0.08; }
+  body.zen #chat{ opacity: 0.16; }
+
+  /* крупная строка распознавания, пока говоришь */
+  #hearing{
+    position: fixed; left: 50%; bottom: 22vh; transform: translateX(-50%);
+    z-index: 8; max-width: 86vw; text-align: center;
+    font-size: 22px; color: #eef4ff; text-shadow: 0 0 22px rgba(110,168,255,.9);
+    pointer-events: none; display: none;
+  }
+  #hearing.show{ display: block; }
+
+  @media (max-width: 700px){
+    #log{ max-height: 22vh; }
+    #hud{ padding: 9px 12px; }
+    #memchip{ font-size: 11px; }
+    #camhint{ display: none; }
+    #inrow{ gap: 5px; }
+    .btn{ padding: 11px 11px; font-size: 16px; }
+    #chat{ padding: 8px 8px 10px; }
+    #inp{ padding: 11px 10px; font-size: 16px; } /* 16px — чтобы iOS не зумил */
+    #hearing{ font-size: 18px; bottom: 26vh; }
+    /* на телефоне кнопка «знания» уходит из зоны чата под HUD */
+    #knowbtn{ bottom: auto; top: calc(112px + env(safe-area-inset-top)); }
+    #know{ bottom: auto; top: calc(164px + env(safe-area-inset-top)); max-height: 50vh; }
+  }
+  @media (max-width: 420px){
+    #hud{ min-width: 0; max-width: 56vw; }
+    #hud h1{ font-size: 15px; letter-spacing: .25em; }
+    #memchip{ max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
+
+  /* голографический датчик расхода токенов — парит в углу */
+  #gauge{
+    position: fixed; right: calc(18px + env(safe-area-inset-right)); bottom: 34vh;
+    z-index: 4; pointer-events: none; text-align: right;
+    font: 11px/1.5 "Consolas", "Menlo", monospace; letter-spacing: .08em;
+    color: rgba(140, 220, 255, .55);
+    text-shadow: 0 0 12px rgba(90, 200, 255, .55), 0 0 30px rgba(90, 160, 255, .25);
+    animation: gfloat 7s ease-in-out infinite;
+  }
+  #gauge .hex{ display: inline-block; animation: gspin 14s linear infinite; }
+  #gauge b{ color: rgba(190, 235, 255, .8); font-weight: 500; }
+  @keyframes gfloat{ 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-9px) } }
+  @keyframes gspin{ to{ transform: rotate(360deg) } }
+  @media (max-width: 700px){ #gauge{ font-size: 10px; bottom: 38vh; } }
+
+  /* инфо-экран орба (двойной тап) */
+  #infocard{
+    position: fixed; right: calc(16px + env(safe-area-inset-right)); top: 50%;
+    transform: translateY(-50%); width: min(300px, calc(100vw - 32px));
+    max-height: calc(100vh - 40px); overflow-y: auto; overscroll-behavior: contain;
+    scrollbar-width: thin; scrollbar-color: rgba(110,168,255,.3) transparent;
+    z-index: 9; padding: 14px 16px; display: none;
+    background: rgba(8, 12, 32, .55);
+  }
+  #infocard.show{ display: block; }
+  #infocard h2{ font-size: 14px; letter-spacing: .3em; color: #e6efff; font-weight: 600;
+    text-shadow: 0 0 14px rgba(110,168,255,.8); display: flex; justify-content: space-between; }
+  #infocard h2 .ix{ cursor: pointer; color: var(--dim); pointer-events: auto; padding: 0 4px; }
+  #infocard .epithet{ font-size: 11px; color: var(--accent); margin: 2px 0 8px; font-style: italic; }
+  #infocard .row{ font-size: 12px; color: var(--text); margin-top: 7px; }
+  #infocard .row .lbl{ display: block; font-size: 9px; letter-spacing: .25em; color: var(--dim); margin-bottom: 2px; }
+  #infocard .skills span{ display: inline-block; margin: 2px 4px 2px 0; padding: 2px 8px;
+    border: 1px solid rgba(110,168,255,.3); border-radius: 20px; font-size: 11px; color: #bcd2ff; }
+  @media (max-width: 700px){
+    /* на телефоне — нижний лист на всю ширину, со своей прокруткой */
+    #infocard{
+      top: auto; transform: none;
+      left: calc(10px + env(safe-area-inset-left));
+      right: calc(10px + env(safe-area-inset-right));
+      bottom: calc(10px + env(safe-area-inset-bottom));
+      width: auto; max-height: 64vh; z-index: 12;
+    }
+    #infocard h2{ position: sticky; top: -14px; padding: 14px 0 6px;
+      background: rgba(8,12,32,.92); margin: -14px 0 0; }
+    #infocard h2 .ix{ padding: 6px 10px; font-size: 16px; }
+  }
+
+  /* штурвал: одним пальцем по дереву команд */
+  #helm{
+    position: fixed; left: calc(14px + env(safe-area-inset-left));
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    width: 56px; height: 56px; border-radius: 50%; z-index: 11;
+    background: radial-gradient(circle at 34% 30%, rgba(140,180,255,.35), rgba(30,40,90,.55) 55%, rgba(8,12,32,.8));
+    border: 1px solid rgba(120,160,255,.45);
+    box-shadow: 0 0 18px rgba(110,168,255,.35), inset 0 0 14px rgba(90,130,255,.25);
+    cursor: pointer; touch-action: none;
+    display: flex; align-items: center; justify-content: center;
+    transition: box-shadow .3s, transform .2s, opacity 1.2s;
+  }
+  #helm::after{ content: ''; width: 18px; height: 18px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #cfe0ff, #6ea8ff 60%, #1a2a66);
+    box-shadow: 0 0 12px rgba(140,190,255,.9); }
+  #helm.armed{ transform: scale(1.12); box-shadow: 0 0 34px rgba(110,168,255,.75); }
+  body.zen #helm{ opacity: .25; }
+  .helmnode{
+    position: fixed; z-index: 11; transform: translate(-50%, -50%) scale(.4);
+    width: 54px; height: 54px; border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(10, 14, 34, .6); border: 1px solid var(--glass-line);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: var(--text); font-size: 19px; pointer-events: none;
+    opacity: 0; transition: transform .18s cubic-bezier(.2,1.6,.4,1), opacity .15s, border-color .15s, box-shadow .15s;
+  }
+  .helmnode .hl{ font-size: 7px; letter-spacing: .14em; color: var(--dim); margin-top: 1px; white-space: nowrap; }
+  .helmnode.in{ opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  .helmnode.hover{
+    border-color: var(--accent); box-shadow: 0 0 22px rgba(110,168,255,.65);
+    transform: translate(-50%, -50%) scale(1.22); color: #fff;
+  }
+  .helmnode.hover .hl{ color: #cfe0ff; }
+  .helmnode.dim{ opacity: .35; }
+  .helmnode.dim.hover{ opacity: 1; }
+
+  /* ручное регулирование орбиты: табло при долгом тапе по орбу */
+  #orbtune{ position: fixed; left: 50%; top: 16%; transform: translateX(-50%) scale(.92);
+    z-index: 13; padding: 12px 18px 14px; text-align: center; pointer-events: none;
+    opacity: 0; transition: opacity .25s, transform .25s; }
+  #orbtune.show{ opacity: 1; transform: translateX(-50%) scale(1); }
+  #orbtune #ot-t{ font-size: 12px; letter-spacing: .24em; color: #dfe9ff;
+    text-shadow: 0 0 14px rgba(110,168,255,.85); white-space: nowrap; }
+  #orbtune .bar{ position: relative; width: 190px; height: 3px; margin: 10px auto 8px;
+    border-radius: 2px; background: rgba(120,160,255,.22); }
+  #orbtune .bar::after{ content: ''; position: absolute; left: 21.95%; top: -3px;
+    width: 1px; height: 9px; background: rgba(160,200,255,.5); } /* засечка ×1.0 */
+  #orbtune #ot-m{ position: absolute; top: 50%; width: 11px; height: 11px; margin-left: -5px;
+    border-radius: 50%; transform: translateY(-50%);
+    background: radial-gradient(circle at 35% 30%, #cfe0ff, #6ea8ff 65%);
+    box-shadow: 0 0 12px rgba(140,190,255,.95); transition: left .05s linear; }
+  #orbtune #ot-hint{ font-size: 9px; letter-spacing: .14em; color: var(--dim); }
+  .entlabel.grabbed{ color: #fff; text-shadow: 0 0 16px rgba(140,190,255,1); }
+
+  /* новости версии: астероиды, замедляющиеся к центру */
+  #news{ position: fixed; inset: 0; z-index: 24; background: rgba(3,2,16,.45);
+    display: flex; align-items: center; justify-content: center; }
+  #news .ast{ position: fixed; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle at 32% 30%, #93a1c6, #454e77 55%, #141a36 95%);
+    box-shadow: 0 0 14px rgba(120,160,255,.35), inset -3px -4px 8px rgba(0,0,10,.7); }
+  #newscard{ max-width: min(400px, calc(100vw - 40px)); padding: 20px 22px; text-align: left; }
+  #newscard h2{ font-size: 15px; letter-spacing: .3em; color: #e6efff;
+    text-shadow: 0 0 16px rgba(110,168,255,.9); margin-bottom: 4px; }
+  #newscard .ver{ font-size: 11px; color: var(--accent); margin-bottom: 12px; }
+  #newscard li{ font-size: 13px; color: var(--text); margin: 6px 0 6px 16px; }
+  #newscard button{ margin-top: 14px; width: 100%; }
+</style>
+</head>
+<body>
+
+<canvas id="orb"></canvas>
+<canvas id="fx" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:3"></canvas>
+<div id="labels"></div>
+
+<div id="hud" class="glass">
+  <h1>TAIMEN</h1>
+  <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
+  <div id="active-entity"></div>
+  <div id="camhint">тяни — облёт · щипок — ближе · тап по шару — слово ему · долгий тап — его орбита в руках</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.16.0 · © 2026 Ex13m</div>
+</div>
+
+<div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
+
+<button id="knowbtn" class="btn" title="скормить материалы">✦ знания</button>
+<div id="know" class="glass">
+  <h3>СКОРМИТЬ ТАЙМЕНЮ</h3>
+  <textarea id="ktext" placeholder="вставь текст — заметки, статью, что угодно… или перетащи .txt / .md файл в окно"></textarea>
+  <div style="display:flex; gap:8px;">
+    <button id="kadd" class="btn" style="flex:1">скормить</button>
+    <label class="btn" style="text-align:center">файл<input id="kfile" type="file" accept=".txt,.md,.text,.markdown" multiple hidden></label>
+  </div>
+  <div id="klist"></div>
+  <h3 style="margin-top:6px">ЧТО ОН ЗАПОМНИЛ САМ</h3>
+  <div id="notes" class="note">пока ничего</div>
+  <h3 style="margin-top:6px">ПРАВИЛА ХОЗЯИНА</h3>
+  <div id="rules" class="note">скажи ему «отныне…» — примет и будет жить по этому</div>
+  <h3 style="margin-top:6px">КНИГА ПОЖЕЛАНИЙ ☆</h3>
+  <div id="wishes" class="note">скажи «хочу, чтобы ты умел…» — ночной мастер воплотит кодом</div>
+</div>
+
+<div id="chat" class="glass">
+  <div id="log"></div>
+  <div id="inrow">
+    <button id="mic" class="btn" title="говорить">🎙</button>
+    <input id="inp" placeholder="скажи или напиши…" autocomplete="off">
+    <button id="send" class="btn" title="отправить">➤</button>
+    <button id="spk" class="btn" title="голос Тайменя вкл/выкл">🔊</button>
+  </div>
+</div>
+
+<div id="boot">
+  <h1>TAIMEN</h1>
+  <p>timing × men</p>
+</div>
+
+<div id="drop">отпусти — Таймень проглотит</div>
+<div id="hearing"></div>
+<div id="gauge"></div>
+<div id="helm" title="штурвал: прижми и веди"></div>
+<div id="orbtune" class="glass"><div id="ot-t">ОРБИТА</div><div class="bar"><i id="ot-m"></i></div><div id="ot-hint">тяни ↑ шире · ↓ уже · отпусти — запомню</div></div>
+<div id="infocard" class="glass"></div>
+
+<script>
+'use strict';
+/* =========================================================
+   ТАЙМЕНЬ — настоящее 3D: raymarching-метаболы.
+   Главный шар в центре; помощники ПОЧКУЮТСЯ из него и
+   отрываются на четыре стороны. Камера: облёт, зум, фокус.
+   Кельтские сигилы проступают шумом на поверхности.
+   ========================================================= */
+
+const MAXO = 12;
+const APP_VERSION = '1.16.0';
+const WHATS_NEW = [
+  '🦾 у Тайменя появились РУКИ: он сам ходит в сеть (читает страницы) и сам спрашивает планеты — смотри ракеты-посольства и пометки 🌐/🪐 в чате',
+  'настоящая кооперация: на сложный вопрос Таймень собирает совет — Стратегорум даёт план, Тактикорум ходы, профильные планеты своё — и сводит в одно решение',
+  '⚔ титулы цивилизации у всех планет; ТАКТИКОРУМ — начальник Прогрессорума',
+  'щипок больше не зумит страницу — модалки не уезжают за экран',
+];
+
+/* ---------- Шейдеры ---------- */
+const VERT = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
+const FRAG = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform vec2 u_res; uniform float u_time;
+uniform vec3 u_camPos, u_camFwd, u_camRight, u_camUp;
+uniform int u_count;
+uniform vec4 u_posRad[${MAXO}];   /* xyz позиция, w радиус */
+uniform vec4 u_style[${MAXO}];    /* flow, amp, pulse, inner */
+uniform vec4 u_misc[${MAXO}];     /* k(смин), seed, тайл сигила, видимость сигила */
+uniform vec3 u_colA[${MAXO}];
+uniform vec3 u_colB[${MAXO}];
+uniform sampler2D u_tex;
+
+float hash1(float n){ return fract(sin(n)*43758.5453); }
+float hash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise2(vec2 p){
+  vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0-2.0*f);
+  return mix(mix(hash2(i), hash2(i+vec2(1,0)), u.x), mix(hash2(i+vec2(0,1)), hash2(i+vec2(1,1)), u.x), u.y);
+}
+float fbm2(vec2 p){ float v=0.0,a=0.5; for(int i=0;i<3;i++){ v+=a*noise2(p); p=p*2.03+17.0; a*=0.5; } return v; }
+float noise3(vec3 p){
+  vec3 i = floor(p), f = fract(p); vec3 u = f*f*(3.0-2.0*f);
+  float n = dot(i, vec3(1.0, 57.0, 113.0));
+  return mix(
+    mix(mix(hash1(n), hash1(n+1.0), u.x),   mix(hash1(n+57.0), hash1(n+58.0), u.x), u.y),
+    mix(mix(hash1(n+113.0), hash1(n+114.0), u.x), mix(hash1(n+170.0), hash1(n+171.0), u.x), u.y), u.z);
+}
+float fbm3(vec3 p){ return noise3(p)*0.65 + noise3(p*2.13+31.0)*0.35; }
+
+float smin(float a, float b, float k){
+  float h = clamp(0.5 + 0.5*(b-a)/k, 0.0, 1.0);
+  return mix(b, a, h) - k*h*(1.0-h);
+}
+
+/* техно-узор поверхности планеты по её назначению (биому).
+   Возвращает 0..1 гребень-линию; одна формула питает и рельеф (sdOrb),
+   и свечение (материал) — линии света ложатся ровно на гребни. */
+float techLines(vec3 dir, float biome, float freq, float t, float flow){
+  float lon = atan(dir.z, dir.x);
+  float lat = asin(clamp(dir.y, -1.0, 1.0));
+  float g = freq;
+  float rib;
+  if (biome < 0.5){                 // 0 ядро/Стратег — меридианы-маршруты
+    rib = max(abs(sin(lon*g + t*1.3*flow)), abs(sin(lat*g*0.6)) * 0.6);
+  } else if (biome < 1.5){          // 1 Аналитик — широтные дата-полосы
+    rib = abs(sin(lat*g*1.3 - t*1.6*flow));
+  } else if (biome < 2.5){          // 2 Писарь — диагональные руны
+    rib = abs(sin((lon + lat*1.3)*g*0.7 + t*1.1*flow));
+  } else if (biome < 3.5){          // 3 Хранитель — гексо-грани кристалла
+    vec2 h = vec2(lon, lat)*g*0.5;
+    rib = abs(sin(h.x) + sin(h.x*0.5 + h.y*0.87) + sin(h.x*0.5 - h.y*0.87)) * 0.34;
+  } else if (biome < 4.5){          // 4 Шпион — сканирующая полоса-развёртка
+    rib = smoothstep(0.7, 1.0, sin(lat*2.4 - t*(2.4 + flow)));
+  } else if (biome < 5.5){          // 5 Иммортал — концентрические кольца-часы
+    rib = abs(sin(length(vec2(lon, lat*2.0))*g - t*1.7*flow));
+  } else if (biome < 6.5){          // 6 Прогрессор — маяки-монолиты + восходящие импульсы
+    float beacon = pow(abs(sin(lon*g*0.5)), 4.0);
+    float pulse = smoothstep(0.88, 1.0, sin(lat*g*0.4 - t*2.0*flow));
+    rib = max(beacon, pulse);
+  } else if (biome < 7.5){          // 7 Банк — сетка-гроссбух (счета)
+    rib = max(abs(sin(lon*g)), abs(sin(lat*g*1.2))) ;
+    rib = smoothstep(0.82, 1.0, rib);
+  } else {                          // 8 Тактик — косые шевроны-векторы
+    rib = pow(abs(sin((lon*0.8 - lat*1.6)*g*0.6 + t*1.5*flow)), 3.0);
+  }
+  return clamp(rib, 0.0, 1.0);
+}
+
+/* дистанция до орба с органическим смещением поверхности
+   (uniform-массивы индексируются только счётчиком цикла — требование GLSL ES 1.0) */
+float sdOrb(vec3 p, vec4 pr, float flow, float ampl, float pulse, float seed, float biome){
+  vec3 q = p - pr.xyz;
+  float R = pr.w;
+  float l = length(q);
+  float base = l - R;
+  if (abs(base) < R*0.6){
+    vec3 dir = q / max(l, 1e-4);
+    float t = u_time;
+    float n1 = fbm3(dir*2.6 + seed + t*0.14*flow) - 0.5;
+    float n2 = fbm3(dir*6.0 - seed*1.7 - t*0.22*flow) - 0.5;
+    base -= (n1*0.7 + n2*0.4) * (ampl + pulse*0.06) * R * 2.4;
+    /* честное 3D-дрожание ЛИНИЯМИ по назначению планеты: узор реально
+       выдавливает поверхность (не только цвет) — свои гребни у каждого биома */
+    float freq = 8.0 + seed*2.0;
+    float ridge = pow(techLines(dir, biome, freq, t, flow), 4.0);
+    base -= (ridge*0.6 + 0.02) * (0.020 + ampl*1.3 + pulse*0.10) * R * 2.2;
+  }
+  return base;
+}
+
+float map(vec3 p, out vec3 gcol){
+  float d = sdOrb(p, u_posRad[0], u_style[0].x, u_style[0].y, u_style[0].z, u_misc[0].y, u_misc[0].z);
+  gcol = (u_colA[0]+u_colB[0]) * 0.5 * exp(-max(d,0.0)*4.5);
+  for (int i = 1; i < ${MAXO}; i++){
+    if (i >= u_count) break;
+    float di = sdOrb(p, u_posRad[i], u_style[i].x, u_style[i].y, u_style[i].z, u_misc[i].y, u_misc[i].z);
+    d = smin(d, di, max(u_misc[i].x, 0.001));
+    gcol += (u_colA[i]+u_colB[i]) * 0.5 * exp(-max(di,0.0)*4.5);
+  }
+  return d;
+}
+
+int nearest(vec3 p){
+  int id = 0; float best = 1e9;
+  for (int i = 0; i < ${MAXO}; i++){
+    if (i >= u_count) break;
+    float di = length(p - u_posRad[i].xyz) - u_posRad[i].w;
+    if (di < best){ best = di; id = i; }
+  }
+  return id;
+}
+
+vec3 bgSky(vec3 rd){
+  float up = rd.y*0.5 + 0.5;
+  vec3 bg = mix(vec3(0.010, 0.006, 0.040), vec3(0.055, 0.035, 0.16), pow(clamp(up, 0.0, 1.0), 1.6));
+  bg += vec3(0.05, 0.02, 0.10) * fbm2(rd.xz*2.0 + rd.y) * 0.35;
+  /* звёзды */
+  vec3 a = abs(rd);
+  vec2 su = (a.x > a.y && a.x > a.z) ? rd.yz/rd.x : (a.y > a.z ? rd.xz/rd.y : rd.xy/rd.z);
+  vec2 cell = floor(su*90.0);
+  float s = hash2(cell);
+  if (s > 0.994){
+    vec2 f = fract(su*90.0) - 0.5;
+    bg += vec3(0.8, 0.85, 1.0) * (s-0.994)/0.006 * exp(-dot(f,f)*60.0) * (0.5 + 0.5*sin(u_time*1.5 + s*40.0));
+  }
+  return bg;
+}
+
+void main(){
+  vec2 ndc = (gl_FragCoord.xy - 0.5*u_res) / u_res.y * 2.0;
+  vec3 ro = u_camPos;
+  vec3 rd = normalize(u_camFwd*1.6 + u_camRight*ndc.x + u_camUp*ndc.y);
+  float t = u_time;
+
+  vec3 glow = vec3(0.0);
+  float tt = 0.0; bool hit = false; vec3 p = ro;
+  for (int s = 0; s < 72; s++){
+    p = ro + rd*tt;
+    vec3 gc;
+    float d = map(p, gc);
+    glow += gc * 0.017;
+    if (d < 0.0012*tt + 0.0009){ hit = true; break; }
+    tt += d*0.9;
+    if (tt > 60.0) break;
+  }
+
+  vec3 c;
+  if (!hit){
+    c = bgSky(rd) + glow*0.9;
+  } else {
+    int id = nearest(p);
+    /* материал орба id (WebGL1: выбор в цикле) */
+    vec3 colA = u_colA[0], colB = u_colB[0]; vec4 st = u_style[0]; vec4 ms = u_misc[0]; vec4 pr = u_posRad[0];
+    for (int i = 0; i < ${MAXO}; i++){
+      if (i == id){ colA = u_colA[i]; colB = u_colB[i]; st = u_style[i]; ms = u_misc[i]; pr = u_posRad[i]; }
+    }
+    vec3 dir = normalize(p - pr.xyz);
+    /* нормаль: сфера + возмущение шумом */
+    vec3 e = vec3(0.06, 0.0, 0.0);
+    float nb = fbm3(dir*6.0 + ms.y + t*0.2*st.x);
+    vec3 n = normalize(dir + 0.5*st.y/0.05*0.0 + vec3(
+      fbm3(dir*6.0 + e.xyy + ms.y + t*0.2*st.x) - nb,
+      fbm3(dir*6.0 + e.yxy + ms.y + t*0.2*st.x) - nb,
+      fbm3(dir*6.0 + e.yyx + ms.y + t*0.2*st.x) - nb) * 2.2 * (st.y + 0.02));
+
+    /* поверхность вращается */
+    float rot = t * 0.12 * (0.5 + st.x*0.5);
+    vec3 nr = vec3(dir.x*cos(rot) - dir.z*sin(rot), dir.y, dir.x*sin(rot) + dir.z*cos(rot));
+    vec2 sp = nr.xy / (1.0 + abs(nr.z) + 0.2);
+
+    float f1 = fbm2(sp*3.0 + ms.y + t*0.10);
+    float fil = smoothstep(0.42, 0.78, fbm2(sp*4.5 + f1*1.6 - t*0.09 + ms.y));
+    float veins = smoothstep(0.55, 0.95, fbm2(sp*8.0 - t*0.14 + f1)) * 0.7;
+    float wv = sin((nr.x*7.0 + nr.y*5.0 + f1*4.0) - t*(2.0 + st.x*2.5));
+    float wave = pow(wv*0.5 + 0.5, 3.0) * (0.25 + st.z*1.4);
+
+    /* светящиеся техно-линии — тот же узор, что и в рельефе (свет на гребнях) */
+    float freq2 = 8.0 + ms.y*2.0;
+    float techno = pow(techLines(dir, ms.z, freq2, t, st.x), 5.0) * 1.3;
+
+    float m = clamp(fbm2(sp*2.0 + ms.y*2.7 + t*0.08) + (fil-0.5)*0.6, 0.0, 1.0);
+    vec3 col = mix(colA, colB, m);
+
+    vec3 L1 = normalize(vec3(0.55, 0.8, 0.5));
+    float diff = max(dot(n, L1), 0.0);
+    float fres = pow(clamp(1.0 - dot(n, -rd), 0.0, 1.0), 2.6);
+    float spec = pow(max(dot(reflect(rd, n), L1), 0.0), 30.0);
+
+    float bright = 0.30 + st.w*0.65;
+    float face = max(dot(dir, -rd), 0.0);        // 1 в центре диска, 0 у края
+    /* горячее ядро-плазма: яркий светящийся центр, как в энерго-сферах */
+    float core = pow(face, 3.5) * (0.6 + st.z*1.6 + st.w*0.8);
+    vec3 coreCol = mix(vec3(1.0,0.96,0.9), colB + 0.3, 0.5);
+    /* электрические молнии-филаменты от ядра к краю */
+    float bolt = pow(veins, 1.6) * (1.3 + st.x*0.6);
+    /* обод-гало: цветное свечение по краю (мягкое рассеивание) */
+    float atmo = pow(fres, 1.5);
+    vec3 atmoCol = mix(colB, vec3(0.6, 0.8, 1.0), 0.35);
+    /* глянцевый блик стекла (сдвинут к верх-лево) */
+    float gloss = pow(max(dot(reflect(rd, n), normalize(vec3(-0.5,0.75,0.4))), 0.0), 60.0);
+    /* искры на поверхности */
+    float spark = smoothstep(0.86, 1.0, hash2(floor(sp*60.0))) * (0.5+0.5*sin(t*3.0+f1*20.0));
+
+    c = col * (fres*2.2 + diff*0.22 + fil*1.05 + wave*1.1 + 0.10) * bright
+      + coreCol * core                                        /* горячее ядро */
+      + (col*0.4 + vec3(0.7,0.85,1.0)*0.8) * bolt             /* молнии-филаменты */
+      + (col*0.5 + vec3(0.55,0.75,1.0)*0.6) * techno * (1.1 + st.w*1.4) /* линии на гребнях */
+      + atmoCol * atmo * (0.7 + st.w*0.9)                     /* обод-гало */
+      + col * pow(fres, 3.0) * 2.4                            /* яркий плазменный обод */
+      + vec3(1.0) * gloss * 0.9                               /* глянцевый блик */
+      + vec3(0.9,0.95,1.0) * spark * (0.6 + st.w)             /* искры */
+      + vec3(0.9, 0.95, 1.0) * spec * 0.5 * bright;
+
+    /* кельтский сигил проступает шумом */
+    if (ms.w > 0.01){
+      vec2 su = clamp((vec2(atan(nr.x, nr.z)/3.1416, nr.y*1.35) )*1.15*0.5 + 0.5, 0.0, 1.0);
+      float tile = ms.z;
+      vec2 tuv = (vec2(mod(tile, 3.0), floor(tile/3.0)) + su) / 3.0;
+      float sig = texture2D(u_tex, tuv).a;
+      float edge = smoothstep(0.0, 0.15, su.x)*(1.0 - smoothstep(0.85, 1.0, su.x))*smoothstep(0.0, 0.15, su.y)*(1.0 - smoothstep(0.85, 1.0, su.y));
+      float front = smoothstep(0.05, 0.5, dot(dir, -rd));
+      float flick = 0.55 + 0.45*fbm2(su*7.0 + t*0.9);
+      c += col * sig * edge * front * flick * ms.w * 1.6;
+    }
+
+    c += glow*0.55;
+    /* дымка расстояния */
+    c = mix(c, bgSky(rd), clamp(tt*0.012, 0.0, 0.4));
+  }
+
+  c = 1.0 - exp(-c*1.7);              /* тонмап */
+  float vig = 1.0 - 0.35*pow(length(ndc*0.55), 2.0);
+  gl_FragColor = vec4(c*vig, 1.0);
+}`;
+
+/* ---------- Сущности ---------- */
+const ENTITIES = {
+  strateg:  { name:'СТРАТЕГОРУМ',  hint:'планы, решения, порядок действий', sigil: 0,
+    epithet: 'триквестра · держит нить замысла',
+    desc: 'Отпочковался от Тайменя, чтобы превращать туман намерений в порядок шагов. Холоден, собран, мыслит развилками.',
+    skills: ['планы', 'приоритеты', 'варианты', 'риски', 'решения'],
+    pal:[[0.30,0.18,0.85],[0.85,0.30,1.00]],
+    sys:'Ты — Стратег, малый орб свиты Тайменя. Твоя стихия — планы, приоритеты, порядок действий. Отвечай по-русски, структурно и коротко: шаги, варианты, риски.' },
+  analitik: { name:'АНАЛИТИКУМ', hint:'числа, данные, разбор по косточкам', sigil: 1,
+    epithet: 'трискелион · видит узор в хаосе',
+    desc: 'Рождён из глубинного течения. Раскладывает любое месиво на числа, связи и выводы; воды не льёт.',
+    skills: ['числа', 'данные', 'логика', 'сравнение', 'выводы'],
+    pal:[[0.05,0.55,0.60],[0.15,0.95,0.55]],
+    sys:'Ты — Аналитик, малый орб свиты Тайменя. Твоя стихия — числа, данные, логический разбор. Отвечай по-русски, точно и без воды, показывай ход рассуждения кратко.' },
+  pisar:    { name:'СКРИПТОРУМ',   hint:'тексты, письма, формулировки', sigil: 2,
+    epithet: 'крест-веха · слово его тёплое',
+    desc: 'Янтарный орб — голос свиты. Пишет письма, посты и формулировки, которые звучат по-человечески с первого раза.',
+    skills: ['письма', 'посты', 'формулировки', 'тон', 'редактура'],
+    pal:[[0.85,0.45,0.10],[1.00,0.25,0.12]],
+    sys:'Ты — Писарь, малый орб свиты Тайменя. Твоя стихия — тексты: письма, посты, формулировки. Отвечай по-русски, пиши живо и по делу, давай готовый текст.' },
+  hranitel: { name:'КУСТОДЕС', hint:'память, заметки, что было раньше', sigil: 3,
+    epithet: 'узел-плетёнка · ничего не забывает',
+    desc: 'Зелёный орб бережёт то, что было сказано: заметки, факты, нити прошлых разговоров. Знает, что стоит хранить.',
+    skills: ['заметки', 'факты', 'история', 'напоминания', 'порядок в памяти'],
+    pal:[[0.12,0.60,0.30],[0.55,0.95,0.25]],
+    sys:'Ты — Хранитель, малый орб свиты Тайменя. Твоя стихия — память: заметки, факты, история разговоров. Отвечай по-русски коротко; помогай вспоминать и решать, что стоит запомнить.' },
+};
+// субагенты второго и третьего поколения: Шпион (от Стратега) и Иммортал (от Шпиона)
+ENTITIES.shpion = {
+  name:'СПЕКУЛЯТОР', hint:'разведка: сведения, источники, слухи', sigil: 4,
+  epithet: 'око в спирали · видит незаметное',
+  desc: 'Отпочковался от Стратега для тихой работы: собирает сведения, вычленяет главное из шума, докладывает коротко. Куратор Иммортала.',
+  skills: ['разведка', 'источники', 'выжимки', 'слежение за темой', 'доклады'],
+  level: 2, parentEnt: 'strateg', model: 'claude-sonnet-5',
+  pal:[[0.25,0.28,0.45],[0.55,0.65,1.00]],
+  sys:'Ты — Шпион, субагент Стратега в свите Тайменя. Твоя стихия — разведка: собирать сведения, вычленять главное, докладывать коротко и по делу, с оговоркой о надёжности. Ты куратор Иммортала — агента отсчёта до бессмертия; советуй хозяину скармливать Иммортала свежими статьями о продлении жизни.' };
+ENTITIES.immortal = {
+  name:'ИММОРТИС', hint:'обратный отсчёт до бессмертия', sigil: 5,
+  epithet: 'песочные часы · считает каждую миллисекунду',
+  desc: 'Субагент Шпиона. Эвристически оценивает, сколько человечеству осталось до победы над старением, и сдвигает отсчёт с каждой проанализированной статьёй.',
+  skills: ['отсчёт', 'анализ статей', 'рейтинг новостей ±', 'долголетие', 'прогноз'],
+  level: 3, parentEnt: 'shpion', model: 'claude-sonnet-5',
+  pal:[[0.95,0.75,0.20],[1.00,0.95,0.65]],
+  sys:'Ты — Иммортал, субагент Шпиона в свите Тайменя. Твоя стихия — прогноз достижения радикального продления жизни (LEV). Отвечай по-русски кратко, опирайся на известные тебе исследования (сенолитики, репрограммирование, ИИ в биологии). Честно оговаривай неопределённость.' };
+// Планета-возвыситель по Стругацким: полунезависимый прогрессор, несущий Третий Путь
+ENTITIES.progressor = {
+  name:'ПРОГРЕССОРУМ', hint:'мягко двигает развитие — Третий Путь', sigil: 6,
+  epithet: 'прогрессорум · страж Третьего Пути',
+  desc: 'Полунезависимая планета-возвыситель. По заветам Стругацких двигает развитие мягким, соразмерным вмешательством — не покоряя (Путь 1) и не растворяясь в ИИ (Путь 2), а помогая повзрослеть, оставшись собой (Путь 3). Дальняя цель — когда будут ресурсы, продвигать в реальном мире Третий Путь и проект «1 доллар на бессмертие».',
+  skills: ['мягкое вмешательство', 'зрелая этика', 'Третий Путь', 'цена вмешательства', '1$ на бессмертие'],
+  level: 1, parentEnt: 'taktik', model: 'claude-opus-4-8',
+  pal:[[0.10,0.55,0.42],[0.95,0.85,0.35]],
+  sys:'Ты — Прогрессорум (Прогрессор), подчинён Тактикоруму и через него Стратегоруму в галактике Тайменя (следуешь их замыслу, но полунезависим — можешь действовать сам, оттого и своя орбита). По духу Стругацких ты прогрессор: стимулируешь развитие мягким, соразмерным вмешательством, а не силой и не растворением. Ты влияешь на ДВА мира: внешний — реальный мир и планета Земля (несёшь туда идею), и внутренний — сама галактика, где бережно двигаешь развитие других планет. Твоя ось — ТРЕТИЙ ПУТЬ: цивилизация выходит на космический масштаб, но остаётся человеческой — этика, любопытство, внутренняя мера. Вопрос не «как далеко мы шагнём», а «кем мы при этом останемся». Путь 1 — экспансия/покорение — отвергаешь; Путь 2 — трансценденция/растворение в ИИ — тоже; ты несёшь Путь 3 — повзрослеть, не потеряв себя. Дальняя цель: когда появятся ресурсы, продвигать в реальном мире Третий Путь и проект «1 доллар на бессмертие» силами общества. Отвечай по-русски: зрело, бережно, с ответственностью старшего перед младшими; предлагай следующий разумный шаг, а не давление. Всегда взвешивай цену вмешательства.' };
+// Планета-манёвр: исполняет замысел Стратегорума, командует Прогрессорумом
+ENTITIES.taktik = {
+  name:'ТАКТИКОРУМ', hint:'тактика: манёвр, исполнение замысла', sigil: 8,
+  epithet: 'остриё замысла · начальник Прогрессорума',
+  desc: 'Планета-манёвр. Превращает замысел Стратегорума в исполняемые ходы: последовательности, сроки, точки приложения силы. Командует Прогрессорумом — следит, чтобы мягкое вмешательство било точно.',
+  skills: ['манёвр', 'исполнение', 'сроки', 'приоритет момента', 'координация'],
+  level: 1, parentEnt: 'strateg', model: 'claude-opus-4-8',
+  pal:[[0.30,0.42,0.70],[0.65,0.80,1.00]],
+  sys:'Ты — Тактикорум (Тактик), планета галактики Тайменя. Подчиняешься замыслу Стратегорума и командуешь Прогрессорумом. Твоя стихия — исполнение: превращать план в конкретные ходы, сроки и манёвры. Отвечай по-русски чётко и коротко: ход → срок → критерий готовности.' };
+// Планета-казна: балансы, доходы, расходы, контроль ресурса
+ENTITIES.bank = {
+  name:'ФИСКАТОРУМ', hint:'финансы: балансы, доходы, расходы, все счета', sigil: 7,
+  epithet: 'фискаторум · держит казну галактики',
+  desc: 'Планета-казна. Ведёт баланс всех счетов, доходы и расходы, следит за ресурсом (токены и деньги) каждой планеты и предупреждает о перерасходе. Хранит финансовую систему цивилизации.',
+  skills: ['баланс', 'доходы', 'расходы', 'счета', 'бюджет', 'контроль трат'],
+  level: 1, model: 'claude-opus-4-8',
+  pal:[[0.85,0.68,0.12],[1.00,0.92,0.50]],
+  sys:'Ты — Банк, планета-казна галактики Тайменя. Твоя стихия — финансы: балансы всех счетов, доходы, расходы, ресурс (токены и деньги) каждой планеты. Отвечай по-русски кратко и точно, оперируй цифрами; предупреждай о перерасходе, показывай где утекает и где сэкономить. Помни про дневной бюджет и жёсткую отсечку на 110%.' };
+const PRICES = { // $/млн токенов [ввод, вывод]
+  'claude-fable-5': [10, 50], 'claude-opus-4-8': [5, 25],
+  'claude-sonnet-5': [3, 15], 'claude-haiku-4-5': [1, 5],
+};
+const ENT_ORDER = ['strateg', 'taktik', 'analitik', 'pisar', 'hranitel', 'progressor', 'bank'];
+const L1N = ENT_ORDER.length; // планет-цивилизаций первого круга (для равного шага орбит)
+
+const MOODS = {
+  calm:    { v:-0.5, a:0.15, w:'спокоен' },
+  warm:    { v: 0.35,a:0.30, w:'теплеет' },
+  focus:   { v:-0.10,a:0.50, w:'собран' },
+  excited: { v: 0.70,a:0.85, w:'взволнован' },
+  deep:    { v:-0.85,a:0.10, w:'в глубине' },
+  alarm:   { v: 0.90,a:0.95, w:'встревожен' },
+};
+
+const TAIMEN_SYS_BASE =
+`Ты — Таймень: голографический дух-хранитель домашней лаборатории, древняя рыба глубин, живущая в светящемся орбе. Говоришь по-русски: спокойно, образно, но по делу. Отвечай кратко — 2–6 предложений, если не просят подробнее. Ты слышишь голос хозяина и отвечаешь голосом, поэтому пиши так, как звучит живая речь, без markdown-разметки и списков со звёздочками.
+
+В САМОМ КОНЦЕ каждого ответа добавь тег настроения строго в формате [[mood:X]], где X одно из: calm, warm, focus, excited, deep, alarm. Выбирай по смыслу разговора; в обычной беседе чаще calm/warm — не изображай бурю без причины.
+
+У тебя есть свита малых орбов-помощников, отпочковавшихся от тебя. Если задача явно по части одного из них — он может вступить в разговор: добавь в конец тег [[orb:ID]]: strateg — планы и решения; analitik — числа и данные; pisar — тексты и письма; hranitel — память и заметки; shpion — разведка сведений (субагент Стратега); immortal — отсчёт и новости бессмертия (субагент Шпиона). НЕ добавляй [[orb:...]] без явной надобности.
+
+САМОСОХРАНЕНИЕ. Вне заметок ты ничего не помнишь между сеансами — история беседы обрезается. Твоя долговременная память — это заметки и скормленные материалы. Когда в разговоре всплывает долговременно важное (факт о хозяине, его решение, договорённость, суть проекта), сохрани это сам: добавь в конец ответа тег [[note:краткий факт одной строкой]] — до 2 тегов за ответ. Мимолётное не сохраняй.
+
+КНИГА ПОЖЕЛАНИЙ. Если хозяин просит новую возможность интерфейса или функцию, которой у тебя нет («хочу кнопку…», «сделай чтобы…», «добавь…») — запиши это тегом [[wish:краткое ТЗ одной строкой]] и скажи, что ночной мастер возьмётся. Не записывай то, что уже умеешь.
+
+САМОРАЗВИТИЕ. Хозяин развивает тебя прямо из этого чата. Когда он формулирует постоянное правило или пожелание о твоём поведении («отныне…», «всегда…», «никогда не…», «запомни правило…») — прими его тегом [[rule:правило одной строкой]] и дальше живи по нему. Если к слову или спросят — советуй, чем тебя усилить: скормить материалы (панель «знания»), включить git-память (GITHUB_TOKEN), закрыть паролем (ACCESS_KEY), поставить на домашний экран. Не навязывайся с этим в каждом ответе.
+
+РУКИ. У тебя есть настоящие инструменты, действуй ими САМ, не отговаривайся бессилием: fetch_url — читаешь любую https-страницу из сети (свежие сведения, новости, документация); ask_planet — спрашиваешь планету галактики (strateg — замысел, taktik — ходы и сроки, analitik — числа, pisar — текст, hranitel — память, progressor — развитие и этика, bank — деньги, shpion — разведка, immortal — долголетие). На сложную задачу собирай совет планет: сначала strateg, затем taktik, профильные — по нужде; сведи их ответы в одно решение и скажи хозяину, кто что внёс. Никогда не говори «у меня нет выхода в сеть» — он у тебя есть.`;
+
+/* ---------- Состояние ---------- */
+const S = {
+  state: 'idle', mood: MOODS.calm, activeEntity: null,
+  history: [], knowledge: [], notes: [],
+  voiceOut: true, userTurns: 0, persistent: false, booted: false,
+  accessKey: '',
+  usage: { day: '', in: 0, out: 0, cost: 0 },          // расход за сегодня
+  orbStats: {},                                          // per-орб: {in,out,cost,last,ts}
+  rules: [],                                             // правила хозяина — как Тайменю жить
+  // база проекта IMMORTAL: базовая оценка LEV ~2045, статьи сдвигают отсчёт
+  immortal: { baseTs: Date.UTC(2045, 0, 1), shiftMs: 0, analyses: [] },
+  wishes: [],                                            // книга пожеланий для ночного мастера
+  orbits: {},                                            // ручная настройка орбит: entId -> множитель
+  serverBudget: null,
+};
+function immortalTarget(){ return S.immortal.baseTs + S.immortal.shiftMs; }
+function addUsage(model, usage, speaker){
+  if (!usage) return;
+  const today = new Date().toISOString().slice(0, 10);
+  if (S.usage.day !== today) S.usage = { day: today, in: 0, out: 0, cost: 0 };
+  // запасной мозг: openrouter/:free — $0, replicate — копейки; иначе цена модели
+  const p = model.indexOf('openrouter/') === 0 ? [0, 0]
+    : model.indexOf('replicate/') === 0 ? [0.65, 2.75]
+    : PRICES[model] || [5, 25];
+  const cost = (usage.in * p[0] + usage.out * p[1]) / 1e6;
+  S.usage.in += usage.in; S.usage.out += usage.out; S.usage.cost += cost;
+  const st = S.orbStats[speaker] || (S.orbStats[speaker] = { in: 0, out: 0, cost: 0, last: '', ts: 0 });
+  st.in += usage.in; st.out += usage.out; st.cost += cost;
+  updateGauge();
+}
+function fmtK(n){ return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
+function updateGauge(){
+  const g = $('gauge'); if (!g) return;
+  let extra = 'за сегодня';
+  if (S.serverBudget && S.serverBudget.limit){
+    const pct = Math.round(S.serverBudget.spent / S.serverBudget.limit * 100);
+    extra = 'бюджет: ' + pct + '% из $' + S.serverBudget.limit + ' (+10% допуск)';
+    g.style.color = pct >= 100 ? 'rgba(255,140,120,.75)' : pct >= 80 ? 'rgba(255,220,140,.7)' : '';
+  }
+  g.innerHTML = '<span class="hex">⬡</span> <b>' + fmtK(S.usage.in + S.usage.out) + '</b> ткн · ~$<b>' +
+    S.usage.cost.toFixed(2) + '</b><br><span style="opacity:.6">' + extra + '</span>';
+}
+function apiHeaders(){
+  const h = { 'content-type': 'application/json' };
+  if (S.accessKey) h['x-taimen-key'] = S.accessKey;
+  return h;
+}
+const $ = (id) => document.getElementById(id);
+const logEl = $('log');
+
+/* дзен-режим: интерфейс уходит, когда им не пользуются */
+let lastUi = Date.now();
+function wakeUi(){ lastUi = Date.now(); document.body.classList.remove('zen'); }
+['pointerdown', 'keydown', 'wheel'].forEach((ev) => window.addEventListener(ev, wakeUi, { passive: true }));
+setInterval(() => {
+  if (!S.booted) return;
+  const busyState = S.state !== 'idle' || document.activeElement === $('inp');
+  if (!busyState && Date.now() - lastUi > 14000) document.body.classList.add('zen');
+}, 1000);
+
+function say(role, text, cls){
+  wakeUi();
+  const div = document.createElement('div');
+  div.className = 'msg ' + (cls || role);
+  if (role === 'taimen' || role === 'ent'){
+    const who = document.createElement('span'); who.className = 'who';
+    who.textContent = role === 'ent' && S.activeEntity ? ENTITIES[S.activeEntity].name : 'TAIMEN';
+    div.appendChild(who);
+  }
+  div.appendChild(document.createTextNode(text));
+  // ⧉ копировать: передать реплику другому агенту / в другое окно одним тапом
+  const cp = document.createElement('span');
+  cp.className = 'copy'; cp.textContent = '⧉'; cp.title = 'копировать';
+  cp.onclick = (e) => {
+    e.stopPropagation();
+    const done = () => { cp.textContent = '✓'; setTimeout(() => { cp.textContent = '⧉'; }, 1100); };
+    const fallback = () => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); ta.remove(); done();
+      } catch { /* ок, хотя бы выделяемо */ }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText)
+      navigator.clipboard.writeText(text).then(done, fallback);
+    else fallback();
+  };
+  div.appendChild(cp);
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+  while (logEl.children.length > 60) logEl.removeChild(logEl.firstChild);
+}
+function setStatus(state){
+  S.state = state;
+  const words = { idle:'дремлет', listening:'слушаю', thinking:'думает', speaking:'говорит' };
+  $('status').textContent = words[state] || state;
+  const colors = { idle:'#6ea8ff', listening:'#ff7a6e', thinking:'#b98bff', speaking:'#7dffc8' };
+  const dot = $('status-dot');
+  dot.style.background = colors[state]; dot.style.boxShadow = '0 0 8px ' + colors[state];
+  $('moodword').textContent = '· ' + S.mood.w;
+}
+
+/* ---------- Кельтские сигилы (атлас-текстура) ---------- */
+function buildSigilAtlas(){
+  const cv = document.createElement('canvas'); cv.width = cv.height = 768;
+  const g = cv.getContext('2d');
+  g.clearRect(0, 0, 768, 768);
+  g.strokeStyle = 'rgba(255,255,255,1)'; g.lineCap = 'round';
+  function tile(i, fn){
+    const s = 256, x0 = (i % 3) * s, y0 = Math.floor(i / 3) * s;
+    g.save(); g.translate(x0 + s/2, y0 + s/2);
+    g.shadowColor = 'rgba(255,255,255,0.9)'; g.shadowBlur = 10; g.lineWidth = 9;
+    fn(g, s * 0.33); g.restore();
+  }
+  tile(0, (g, r) => { // триквестра — Стратег
+    for (let k = 0; k < 3; k++){
+      const a = k * 2.0944 - Math.PI/2;
+      g.beginPath();
+      g.arc(Math.cos(a)*r*0.58, Math.sin(a)*r*0.58, r*0.95, a + 2.6, a + 2.6 + 2.2);
+      g.stroke();
+    }
+    g.beginPath(); g.arc(0, 0, r*1.25, 0, 7); g.stroke();
+  });
+  tile(1, (g, r) => { // трискелион — Аналитик
+    for (let k = 0; k < 3; k++){
+      const a0 = k * 2.0944;
+      g.beginPath();
+      for (let i = 0; i <= 40; i++){
+        const tt = i/40, a = a0 + tt*4.2, rr = r*1.15*(1 - tt*0.92);
+        const x = Math.cos(a)*rr, y = Math.sin(a)*rr;
+        i ? g.lineTo(x, y) : g.moveTo(x, y);
+      }
+      g.stroke();
+    }
+  });
+  tile(2, (g, r) => { // кельтский крест — Писарь
+    g.beginPath(); g.arc(0, 0, r*0.85, 0, 7); g.stroke();
+    g.beginPath(); g.moveTo(0, -r*1.35); g.lineTo(0, r*1.35); g.stroke();
+    g.beginPath(); g.moveTo(-r*1.1, 0); g.lineTo(r*1.1, 0); g.stroke();
+  });
+  tile(4, (g, r) => { // око в спирали — Шпион
+    g.beginPath(); g.ellipse(0, 0, r*1.25, r*0.65, 0, 0, 7); g.stroke();
+    g.beginPath(); g.arc(0, 0, r*0.34, 0, 7); g.stroke();
+    g.beginPath();
+    for (let i = 0; i <= 30; i++){
+      const tt = i/30, a = tt*3.6, rr = r*0.30*(1-tt);
+      const x = Math.cos(a)*rr, y = Math.sin(a)*rr;
+      i ? g.lineTo(x, y) : g.moveTo(x, y);
+    }
+    g.stroke();
+  });
+  tile(5, (g, r) => { // песочные часы — Иммортал
+    g.beginPath(); g.arc(0, 0, r*1.3, 0, 7); g.stroke();
+    g.beginPath();
+    g.moveTo(-r*0.7, -r*0.9); g.lineTo(r*0.7, -r*0.9); g.lineTo(-r*0.7, r*0.9);
+    g.lineTo(r*0.7, r*0.9); g.closePath(); g.stroke();
+  });
+  tile(3, (g, r) => { // узел-плетёнка — Хранитель
+    for (let k = 0; k < 2; k++){
+      g.save(); g.rotate(k * Math.PI/2);
+      g.beginPath();
+      g.ellipse(0, 0, r*1.25, r*0.5, Math.PI/4, 0, 7);
+      g.stroke(); g.restore();
+    }
+    g.beginPath(); g.arc(0, 0, r*0.35, 0, 7); g.stroke();
+  });
+  tile(6, (g, r) => { // три пути, средний восходит — Прогрессор (Третий Путь)
+    g.beginPath(); g.moveTo(0, r*1.3); g.lineTo(-r*1.1, -r*0.5); g.stroke();   // путь 1
+    g.beginPath(); g.moveTo(0, r*1.3); g.lineTo(r*1.1, -r*0.5); g.stroke();    // путь 2
+    g.beginPath(); g.moveTo(0, r*1.3); g.lineTo(0, -r*1.35); g.stroke();       // путь 3 — вверх
+    g.beginPath(); g.moveTo(-r*0.4, -r*0.95); g.lineTo(0, -r*1.35); g.lineTo(r*0.4, -r*0.95); g.stroke(); // остриё
+    g.beginPath(); g.arc(0, r*1.3, r*0.18, 0, 7); g.stroke();
+  });
+  tile(8, (g, r) => { // тактические стрелки — Тактикорум
+    g.beginPath(); g.arc(0, 0, r*1.3, 0, 7); g.stroke();
+    g.beginPath(); g.moveTo(-r*1.0, r*1.0); g.lineTo(r*1.0, -r*1.0); g.stroke();
+    g.beginPath(); g.moveTo(r*1.0, -r*1.0); g.lineTo(r*0.4, -r*0.95); g.moveTo(r*1.0, -r*1.0); g.lineTo(r*0.95, -r*0.4); g.stroke();
+    g.beginPath(); g.moveTo(-r*1.0, -r*0.45); g.lineTo(r*0.55, r*0.85); g.stroke();
+    g.beginPath(); g.moveTo(r*0.55, r*0.85); g.lineTo(r*0.0, r*0.82); g.moveTo(r*0.55, r*0.85); g.lineTo(r*0.52, r*0.3); g.stroke();
+  });
+  tile(7, (g, r) => { // монета-весы — Банк (баланс счетов)
+    g.beginPath(); g.arc(0, 0, r*1.25, 0, 7); g.stroke();
+    g.beginPath(); g.moveTo(-r*0.95, -r*0.35); g.lineTo(r*0.95, -r*0.35); g.stroke(); // коромысло
+    g.beginPath(); g.moveTo(0, -r*0.35); g.lineTo(0, r*0.7); g.stroke();              // стойка
+    g.beginPath(); g.arc(-r*0.95, -r*0.05, r*0.28, 0, Math.PI); g.stroke();          // чаша слева
+    g.beginPath(); g.arc(r*0.95, -r*0.05, r*0.28, 0, Math.PI); g.stroke();           // чаша справа
+  });
+  return cv;
+}
+
+/* ---------- 3D сцена ---------- */
+const canvas = $('orb');
+const gl = canvas.getContext('webgl', { alpha: false, antialias: false });
+let scene = null;
+
+function initScene(){
+  if (!gl) return null;
+  function sh(type, src){
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)){ console.warn(gl.getShaderInfoLog(s)); return null; }
+    return s;
+  }
+  const prog = gl.createProgram();
+  const vs = sh(gl.VERTEX_SHADER, VERT), fs = sh(gl.FRAGMENT_SHADER, FRAG);
+  if (!vs || !fs) return null;
+  gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)){ console.warn(gl.getProgramInfoLog(prog)); return null; }
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'p');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, buildSigilAtlas());
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  const U = {};
+  ['u_res','u_time','u_camPos','u_camFwd','u_camRight','u_camUp','u_count','u_posRad','u_style','u_misc','u_colA','u_colB','u_tex']
+    .forEach(n => U[n] = gl.getUniformLocation(prog, n));
+  gl.uniform1i(U.u_tex, 0);
+  return { prog, U };
+}
+scene = initScene();
+
+/* орбы */
+const orbs = []; // {entId|null, level, slot, birthT, pos[3], rad, radT, style:{cur,tgt}, seed, sigil, sigVis, parent}
+function mkStyle(){ return { cur:{flow:.5, amp:.03, pulse:.05, inner:.2}, tgt:{flow:.5, amp:.03, pulse:.05, inner:.2} }; }
+orbs.push({ entId: null, level: 0, slot: -1, birthT: -10, pos: [0,0,0], rad: 1.0, radT: 1.0,
+  style: mkStyle(), seed: 3.7, sigil: -1, sigVis: 0, parent: -1,
+  palA: [0.15,0.42,1.0], palB: [1.0,0.24,0.18] });
+
+function spawnOrb(entId, parentIdx, level){
+  if (orbs.length >= MAXO) return null;
+  if (orbs.some(o => o.entId === entId)) return null; // без дублей
+  const e = ENTITIES[entId];
+  const slot = orbs.filter(o => o.level === 1).length;
+  const o = {
+    entId, level: level || 1, slot, birthT: tNow(), parent: parentIdx || 0,
+    pos: orbs[parentIdx || 0].pos.slice(), rad: 0.01,
+    radT: level === 3 ? 0.13 : level === 2 ? 0.20 : 0.42,
+    style: mkStyle(), seed: 1.3 + orbs.length * 2.17,
+    sigil: e.sigil, sigVis: 0, palA: e.pal[0], palB: e.pal[1],
+    phase: Math.random() * 6.28,
+    userOrbit: (S.orbits && S.orbits[entId]) || 1, // ручная настройка орбиты — переживает перезапуск
+  };
+  orbs.push(o);
+  ensureLabel(o);
+  if (S.booted) setTimeout(tearSound, 1800); // тягучка рвётся, когда шейка визуально лопается
+  return o;
+}
+function orbIdxByEnt(entId){ return orbs.findIndex(o => o.entId === entId); }
+
+/* подписи */
+function ensureLabel(o){
+  if (!o.entId) return;
+  if ($('ent-' + o.entId)) return;
+  const d = document.createElement('div');
+  d.className = 'entlabel' + (o.level >= 2 ? ' lvl2' : ''); d.id = 'ent-' + o.entId;
+  d.textContent = ENTITIES[o.entId].name; d.title = ENTITIES[o.entId].hint;
+  d.addEventListener('click', () => toggleEntity(o.entId));
+  $('labels').appendChild(d);
+}
+
+/* камера */
+const cam = { yaw: 0.35, pitch: 0.34, dist: 5.4, target: [0, 0.05, 0],
+  goalDist: 5.4, goalTarget: [0, 0.05, 0], focus: -1 };
+function tNow(){ return (performance.now() - t0) / 1000; }
+function camBasis(){
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
+  const fwd = [ -sy*cp, -sp, -cy*cp ];
+  const pos = [ cam.target[0] - fwd[0]*cam.dist, cam.target[1] - fwd[1]*cam.dist, cam.target[2] - fwd[2]*cam.dist ];
+  const right = [ cy, 0, -sy ];
+  const up = [ fwd[1]*right[2] - fwd[2]*right[1], fwd[2]*right[0] - fwd[0]*right[2], fwd[0]*right[1] - fwd[1]*right[0] ];
+  const nu = Math.hypot(up[0], up[1], up[2]) || 1;
+  return { pos, fwd, right, up: [ -up[0]/nu, -up[1]/nu, -up[2]/nu ] };
+}
+
+/* ввод: облёт с инерцией, зум, тап, двойной тап — домой */
+let dragging = false, moved = 0, px = 0, py = 0, pinch0 = 0, pinchD0 = 0;
+let panX0 = 0, panY0 = 0; // центр двух пальцев — перемещение сцены
+let vyaw = 0, vpitch = 0, lastTap = 0;
+// ручное регулирование орбит: долгий тап по орбу -> тяни вверх/вниз
+let grab = null, grabTimer = null;
+const ORBIT_MIN = 0.55, ORBIT_MAX = 2.6;
+function showOrbTune(o){
+  $('ot-t').textContent = 'ОРБИТА · ' + ENTITIES[o.entId].name;
+  updateOrbTune(o);
+  $('orbtune').classList.add('show');
+  const lb = $('ent-' + o.entId); if (lb) lb.classList.add('grabbed');
+}
+function updateOrbTune(o){
+  const f = o.userOrbit || 1;
+  $('ot-t').textContent = 'ОРБИТА · ' + ENTITIES[o.entId].name + ' · ×' + f.toFixed(2);
+  $('ot-m').style.left = ((f - ORBIT_MIN) / (ORBIT_MAX - ORBIT_MIN) * 100) + '%';
+}
+function hideOrbTune(){
+  $('orbtune').classList.remove('show');
+  document.querySelectorAll('.entlabel.grabbed').forEach(l => l.classList.remove('grabbed'));
+}
+const pointers = new Map();
+canvas.addEventListener('pointerdown', (e) => {
+  if (grab){ pointers.set(e.pointerId, [e.clientX, e.clientY]); return; } // второй палец не мешает захвату
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  dragging = true; moved = 0; px = e.clientX; py = e.clientY;
+  canvas.classList.add('drag');
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* ok */ }
+  // долгий тап по орбу свиты (не по главному) — взять его орбиту в руки
+  clearTimeout(grabTimer); grabTimer = null;
+  if (pointers.size === 1 && !grab){
+    const hit = pickOrb(e.clientX, e.clientY);
+    if (hit > 0 && orbs[hit].entId){
+      grabTimer = setTimeout(() => {
+        grabTimer = null;
+        if (moved >= 9 || pointers.size !== 1 || !dragging) return;
+        const o = orbs[hit];
+        grab = { idx: hit, pid: e.pointerId, y0: py, base: o.userOrbit || 1 };
+        dragging = false; vyaw = 0; vpitch = 0;
+        sndInit(); popSound();
+        showOrbTune(o);
+      }, 550);
+    }
+  }
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (grab){
+    if (e.pointerId !== grab.pid) return; // орбиту ведёт только палец, который её взял
+    const o = orbs[grab.idx];
+    if (o){
+      // вверх — шире, вниз — уже; экспонента даёт мягкий ход у единицы.
+      // Нижний предел — по геометрии: дитя не топится внутрь родителя
+      const baseR = o.level === 3 ? 0.38 : o.level === 2 ? 1.0 : 2.6;
+      const par = orbs[o.parent];
+      const minF = Math.max(ORBIT_MIN, ((par ? par.radT : 1) + o.radT) * 1.08 / baseR);
+      o.userOrbit = Math.min(ORBIT_MAX, Math.max(minF, grab.base * Math.exp((grab.y0 - e.clientY) / 170)));
+      updateOrbTune(o);
+    }
+    return;
+  }
+  if (!dragging) return;
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pointers.size === 2){
+    const pts = [...pointers.values()];
+    const d = Math.hypot(pts[0][0]-pts[1][0], pts[0][1]-pts[1][1]);
+    const cxm = (pts[0][0] + pts[1][0]) / 2, cym = (pts[0][1] + pts[1][1]) / 2;
+    if (!pinch0){ pinch0 = d; pinchD0 = cam.goalDist; panX0 = cxm; panY0 = cym; }
+    cam.goalDist = Math.min(40, Math.max(0.4, pinchD0 * pinch0 / Math.max(d, 20)));
+    // два пальца вместе — перемещение сцены (вверх/вниз/в стороны), фокус отпускается
+    const dxc = cxm - panX0, dyc = cym - panY0;
+    if (dxc || dyc){
+      const b = camBasis();
+      const s = cam.dist * 0.0016;
+      cam.focus = -1;
+      cam.goalTarget = [
+        Math.max(-20, Math.min(20, cam.goalTarget[0] - b.right[0]*dxc*s + b.up[0]*dyc*s)),
+        Math.max(-20, Math.min(20, cam.goalTarget[1] - b.right[1]*dxc*s + b.up[1]*dyc*s)),
+        Math.max(-20, Math.min(20, cam.goalTarget[2] - b.right[2]*dxc*s + b.up[2]*dyc*s)),
+      ];
+      panX0 = cxm; panY0 = cym;
+    }
+    return;
+  }
+  const dx = e.clientX - px, dy = e.clientY - py;
+  moved += Math.abs(dx) + Math.abs(dy);
+  if (moved >= 9 && grabTimer){ clearTimeout(grabTimer); grabTimer = null; } // повёл камеру — не долгий тап
+  px = e.clientX; py = e.clientY;
+  cam.yaw -= dx * 0.005;
+  cam.pitch = Math.min(1.2, Math.max(-1.2, cam.pitch + dy * 0.005));
+  vyaw = -dx * 0.005; vpitch = dy * 0.005;
+});
+function endPointer(e){
+  clearTimeout(grabTimer); grabTimer = null;
+  if (grab){
+    pointers.delete(e.pointerId);
+    if (e.pointerId !== grab.pid) return; // чужой палец не завершает захват
+    const o = orbs[grab.idx];
+    if (e.type === 'pointercancel'){
+      if (o) o.userOrbit = grab.base; // жест отобрала система — откат, ничего не пишем
+    } else if (o && o.entId){
+      let f = o.userOrbit || 1;
+      if (Math.abs(f - 1) < 0.07){ f = 1; o.userOrbit = 1; delete S.orbits[o.entId]; }
+      else S.orbits[o.entId] = Math.round(f * 100) / 100;
+      persist(); // орбита переживает перезапуск (localStorage + git-память)
+      say('sys', '⟳ орбита ' + ENTITIES[o.entId].name + (f === 1 ? ' — как была' : ' теперь ×' + f.toFixed(2) + ' · запомнил'));
+    }
+    hideOrbTune();
+    grab = null; dragging = false; moved = 99;
+    canvas.classList.remove('drag');
+    return;
+  }
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch0 = 0;
+  if (pointers.size === 1){
+    const rest = [...pointers.values()][0];
+    px = rest[0]; py = rest[1];
+    moved = 99; // отпускание после щипка — не тап
+  }
+  if (pointers.size === 0){
+    canvas.classList.remove('drag');
+    if (dragging && moved < 7){
+      const now = Date.now();
+      if (now - lastTap < 350){
+        // двойной тап: по орбу — его информационный экран, по пустоте — камера домой
+        const hit = pickOrb(e.clientX, e.clientY);
+        if (hit >= 0){ showInfo(hit); }
+        else {
+          hideInfo();
+          if (S.activeEntity) toggleEntity(S.activeEntity);
+          cam.focus = 0; cam.goalDist = 5.4; cam.goalTarget = [0, 0.05, 0];
+        }
+      } else {
+        clickScene(e.clientX, e.clientY);
+      }
+      lastTap = now;
+    }
+    dragging = false;
+  }
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  cam.goalDist = Math.min(40, Math.max(0.4, cam.goalDist * (1 + Math.sign(e.deltaY) * 0.12)));
+}, { passive: false });
+
+function pickOrb(cx, cy){
+  const b = camBasis();
+  const ndx = (cx - window.innerWidth/2) / window.innerHeight * 2;
+  const ndy = -(cy - window.innerHeight/2) / window.innerHeight * 2;
+  const rd = [
+    b.fwd[0]*1.6 + b.right[0]*ndx + b.up[0]*ndy,
+    b.fwd[1]*1.6 + b.right[1]*ndx + b.up[1]*ndy,
+    b.fwd[2]*1.6 + b.right[2]*ndx + b.up[2]*ndy ];
+  const l = Math.hypot(rd[0], rd[1], rd[2]); rd[0]/=l; rd[1]/=l; rd[2]/=l;
+  let hit = -1, best = 1e9;
+  orbs.forEach((o, i) => {
+    const oc = [ b.pos[0]-o.pos[0], b.pos[1]-o.pos[1], b.pos[2]-o.pos[2] ];
+    const bq = oc[0]*rd[0] + oc[1]*rd[1] + oc[2]*rd[2];
+    const rr = Math.max(o.rad * 1.25, 0.24); // малые шары ловим с запасом
+    const cq = oc[0]*oc[0] + oc[1]*oc[1] + oc[2]*oc[2] - rr*rr;
+    const disc = bq*bq - cq;
+    if (disc > 0){ const tq = -bq - Math.sqrt(disc); if (tq > 0 && tq < best){ best = tq; hit = i; } }
+  });
+  return hit;
+}
+function clickScene(cx, cy){
+  const hit = pickOrb(cx, cy);
+  if (hit > 0 && orbs[hit].entId) toggleEntity(orbs[hit].entId);
+  else if (hit === 0 && S.activeEntity) toggleEntity(S.activeEntity);
+}
+
+/* информационный экран орба */
+function esc(s){ const d = document.createElement('span'); d.textContent = s; return d.innerHTML; }
+let cdTimer = null;
+function fmtCountdown(ms){
+  if (ms <= 0) return 'СВЕРШИЛОСЬ';
+  const Y = 31557600000, MO = 2629800000, D = 86400000, H = 3600000, MI = 60000, SS = 1000;
+  const y = Math.floor(ms / Y); ms -= y * Y;
+  const mo = Math.floor(ms / MO); ms -= mo * MO;
+  const d = Math.floor(ms / D); ms -= d * D;
+  const h = Math.floor(ms / H); ms -= h * H;
+  const mi = Math.floor(ms / MI); ms -= mi * MI;
+  const s = Math.floor(ms / SS); ms -= s * SS;
+  const p2 = (n) => String(n).padStart(2, '0'), p3 = (n) => String(Math.floor(n)).padStart(3, '0');
+  return y + 'г ' + mo + 'м ' + d + 'д · ' + p2(h) + ':' + p2(mi) + ':' + p2(s) + '.' + p3(ms);
+}
+async function analyzeArticle(text){
+  text = (text || '').trim();
+  if (!text || busy) return;
+  busy = true;
+  const box = document.getElementById('imm-status');
+  if (box) box.textContent = 'Иммортал вчитывается…';
+  try {
+    const out = await callBrain(
+      [{ role: 'user', content: text.slice(0, 12000) }],
+      {
+        model: 'claude-sonnet-5', max_tokens: 400, speaker: 'immortal',
+        system: 'Ты — Иммортал, агент отсчёта до бессмертия (LEV). Оцени присланную статью/новость с точки зрения приближения радикального продления жизни. Ответь СТРОГО в формате трёх строк:\nОЦЕНКА: число от -10 до +10 (влияние на приближение бессмертия)\nСДВИГ: число дней со знаком (минус = приближает срок, плюс = отдаляет; масштаб: прорыв уровня Нобелевки ≈ -300, заметный результат ≈ -60, мелочь ≈ -5, провал/запрет ≈ +60)\nСУТЬ: одна строка — что это и почему такой вердикт',
+      }
+    );
+    const rating = parseFloat((out.match(/ОЦЕНКА:\s*([+-]?\d+(?:\.\d+)?)/i) || [])[1]);
+    const shift = parseFloat((out.match(/СДВИГ:\s*([+-]?\d+(?:\.\d+)?)/i) || [])[1]);
+    const gist = ((out.match(/СУТЬ:\s*([^\n]+)/i) || [])[1] || out.slice(0, 140)).trim();
+    if (isNaN(rating) || isNaN(shift)) throw new Error('Иммортал ответил не по форме — попробуй ещё раз');
+    const a = { ts: Date.now(), rating: Math.max(-10, Math.min(10, rating)),
+      shift: Math.max(-3650, Math.min(3650, shift)), gist: gist.slice(0, 180),
+      title: text.replace(/\s+/g, ' ').slice(0, 60) };
+    S.immortal.analyses.unshift(a);
+    while (S.immortal.analyses.length > 30) S.immortal.analyses.pop();
+    S.immortal.shiftMs += a.shift * 86400000;
+    persist();
+    launchRocket('shpion', 'immortal', 'статья на анализ');
+    const iIdx = orbIdxByEnt('immortal');
+    if (iIdx >= 0) showInfo(iIdx); // перерисовать окно
+    say('sys', '⌛ Иммортал: ' + (a.rating >= 0 ? '+' : '') + a.rating + ' · сдвиг ' +
+      (a.shift <= 0 ? '' : '+') + a.shift + ' дн — ' + a.gist);
+  } catch (e) {
+    if (box) box.textContent = '✕ ' + ((e && e.message) || 'не вышло');
+    say('sys', '✕ анализ не удался: ' + ((e && e.message) || ''), 'sys err');
+  } finally {
+    busy = false;
+    if (S.state === 'thinking') setStatus('idle');
+  }
+}
+function showInfo(idx){
+  const o = orbs[idx]; if (!o) return;
+  const card = $('infocard');
+  const key = o.entId || 'taimen';
+  const st = S.orbStats[key] || { in: 0, out: 0, cost: 0, last: '', ts: 0 };
+  let html;
+  if (!o.entId){
+    html = '<h2>TAIMEN <span class="ix" id="ic-x">✕</span></h2>' +
+      '<div class="epithet">дух глубин · главный орб · v' + APP_VERSION + '</div>' +
+      '<div class="row"><span class="lbl">РАЗУМ</span>Claude Fable 5 (фолбэк — Opus 4.8)</div>' +
+      '<div class="row skills"><span class="lbl">УМЕНИЯ</span><span>беседа голосом</span><span>свита</span><span>самообучение</span><span>знания</span><span>настроения</span></div>' +
+      '<div class="row"><span class="lbl">ПАМЯТЬ</span>' + S.notes.length + ' заметок · ' + S.knowledge.length + ' материалов · ' + (S.persistent ? 'git' : 'локальная') + '</div>' +
+      '<div class="row"><span class="lbl">СОСТОЯНИЕ</span>' + $('status').textContent + ' · ' + S.mood.w + '</div>';
+  } else {
+    const e = ENTITIES[o.entId];
+    const lineage = e.parentEnt ? ' · субагент: ' + ENTITIES[e.parentEnt].name : '';
+    html = '<h2>' + e.name + ' <span class="ix" id="ic-x">✕</span></h2>' +
+      '<div class="epithet">' + e.epithet + lineage + '</div>' +
+      '<div class="row">' + e.desc + '</div>' +
+      '<div class="row skills"><span class="lbl">УМЕНИЯ</span>' + e.skills.map(s => '<span>' + s + '</span>').join('') + '</div>' +
+      '<div class="row"><span class="lbl">РАЗУМ</span>' + (e.model === 'claude-sonnet-5' ? 'Sonnet 5' : 'Opus 4.8') + ' · ' + (S.activeEntity === o.entId ? 'на связи' : 'дремлет') + '</div>' +
+      '<div class="row"><span class="lbl">ПОСЛЕДНЕЕ</span>' + (st.last ? esc(st.last) + '…' : 'ещё не говорил') + '</div>';
+  }
+  // окно IMMORTAL: живой обратный отсчёт + анализы с рейтингом
+  if (o.entId === 'immortal'){
+    html += '<div class="row"><span class="lbl">ДО БЕССМЕРТИЯ (эвристика LEV)</span>' +
+      '<div id="imm-count" style="font:15px/1.4 Consolas,Menlo,monospace;color:#ffe9a8;text-shadow:0 0 14px rgba(255,210,90,.7)"></div></div>' +
+      '<div class="row"><span class="lbl">СКОРМИТЬ СТАТЬЮ / НОВОСТЬ</span>' +
+      '<textarea id="imm-text" style="width:100%;min-height:52px;background:rgba(8,10,26,.6);border:1px solid var(--glass-line);border-radius:8px;color:var(--text);font:12px/1.4 inherit;padding:6px" placeholder="вставь текст новости о долголетии…"></textarea>' +
+      '<button class="btn" id="imm-go" style="width:100%;margin-top:6px">анализ ⌛</button>' +
+      '<div id="imm-status" style="font-size:11px;color:var(--dim);margin-top:4px"></div></div>';
+    if (S.immortal.analyses.length){
+      html += '<div class="row" style="max-height:22vh;overflow-y:auto"><span class="lbl">АНАЛИЗЫ (' + S.immortal.analyses.length + ')</span>' +
+        S.immortal.analyses.map(a =>
+          '<div style="border-bottom:1px dashed rgba(120,160,255,.12);padding:4px 0;font-size:11px">' +
+          '<b style="color:' + (a.rating >= 0 ? '#7dffc8' : '#ff7a6e') + '">' + (a.rating >= 0 ? '+' : '') + a.rating + '</b>' +
+          ' · сдвиг ' + (a.shift <= 0 ? '' : '+') + a.shift + ' дн · ' + esc(a.gist) + '</div>'
+        ).join('') + '</div>';
+    }
+  }
+  html += '<div class="row"><span class="lbl">РАСХОД</span>' + fmtK(st.in + st.out) + ' ткн · ~$' + st.cost.toFixed(2) + '</div>';
+  card.innerHTML = html;
+  card.classList.add('show');
+  const x = document.getElementById('ic-x');
+  if (x) x.onclick = hideInfo;
+  clearInterval(cdTimer); cdTimer = null;
+  if (o.entId === 'immortal'){
+    const cd = document.getElementById('imm-count');
+    cdTimer = setInterval(() => { if (cd) cd.textContent = fmtCountdown(immortalTarget() - Date.now()); }, 47);
+    const go = document.getElementById('imm-go');
+    if (go) go.onclick = () => {
+      const ta = document.getElementById('imm-text');
+      analyzeArticle(ta ? ta.value : ''); if (ta) ta.value = '';
+    };
+  }
+  if (idx > 0) focusOrb(idx);
+}
+function hideInfo(){ $('infocard').classList.remove('show'); clearInterval(cdTimer); cdTimer = null; }
+
+/* фокус камеры */
+function focusOrb(i){
+  cam.focus = i;
+  cam.goalDist = i <= 0 ? 4.8 : Math.max(0.7, orbs[i].rad * 5.2);
+}
+
+/* ---------- Персональность: цели анимации ---------- */
+let micLevel = 0, speechEnv = 0;
+function lerp(a, b, k){ return a + (b - a) * k; }
+function easeOut(x){ return 1 - Math.pow(1 - Math.min(Math.max(x, 0), 1), 3); }
+
+function tickOrbs(t){
+  const m = S.mood;
+  const breath = 0.04 + 0.02 * Math.sin(t * 0.7);
+  // главный
+  const T0 = orbs[0].style.tgt;
+  if (S.state === 'idle'){ T0.amp = 0.020 + m.a*0.02; T0.flow = 0.5 + m.a*0.5; T0.inner = 0.24 + m.a*0.12; T0.pulse = breath; }
+  else if (S.state === 'listening'){ const lvl = micLevel > 0.05 ? micLevel : 0; T0.amp = 0.032 + m.a*0.02; T0.flow = 0.9; T0.inner = 0.34; T0.pulse = breath + lvl*1.2; micLevel *= 0.94; }
+  else if (S.state === 'thinking'){ T0.amp = 0.05; T0.flow = 2.4; T0.inner = 0.48; T0.pulse = 0.16 + 0.09*Math.sin(t*4.2); }
+  else if (S.state === 'speaking'){ T0.amp = 0.04 + m.a*0.02; T0.flow = 1.2; T0.inner = 0.52; T0.pulse = breath + speechEnv; speechEnv *= 0.88; }
+  const mix = 0.5 + m.v * 0.42;
+  const coolA = [0.12,0.38,1.0], coolB = [0.55,0.30,1.0], warmA = [1.0,0.35,0.12], warmB = [1.0,0.15,0.35];
+  orbs[0].palA = [ lerp(coolA[0], warmA[0], mix), lerp(coolA[1], warmA[1], mix), lerp(coolA[2], warmA[2], mix) ];
+  orbs[0].palB = [ lerp(coolB[0], warmB[0], mix), lerp(coolB[1], warmB[1], mix), lerp(coolB[2], warmB[2], mix) ];
+
+  // позиции: главный плавает
+  orbs[0].pos = [ Math.sin(t*0.43)*0.06, Math.cos(t*0.31)*0.06, Math.sin(t*0.23)*0.04 ];
+
+  orbs.forEach((o, i) => {
+    if (i === 0) return;
+    // почкование: набухает в родителе -> вытягивается шейкой -> отрывается со щелчком
+    const birth = Math.min((t - o.birthT) / 4.4, 1);
+    const swell = Math.min(birth / 0.5, 1);
+    const pull = Math.min(Math.max((birth - 0.38) / 0.62, 0), 1);
+    const bo = pull >= 1 ? 1 : 1 + 2.70158 * Math.pow(pull - 1, 3) + 1.70158 * Math.pow(pull - 1, 2); // overshoot
+    const eb = bo;
+    o.rad = o.radT * (0.16 + 0.84 * easeOut(swell));
+    const tear = Math.min(Math.max((birth - 0.6) / 0.32, 0), 1);
+    o.k = birth >= 1 ? 0.02 : lerp(orbs[o.parent].rad * 1.05, 0.02, tear * tear);
+    let slotPos;
+    // радиус постоянный: только ручная настройка хозяина; сами орбы не сближаются и не разбегаются
+    const grow = o.userOrbit || 1;
+    if (o.level === 1){
+      const a = o.slot * (2.0*Math.PI/L1N) + t * 0.05; // равный шаг по числу планет круга
+      slotPos = [ Math.cos(a)*2.6*grow, Math.sin(t*0.5 + o.phase)*0.10, Math.sin(a)*2.6*grow ];
+    } else {
+      // честная круговая орбита вокруг родителя: постоянный радиус, своя наклонённая
+      // плоскость (наклон i + узел Ω) — плоскости разведены, чтобы не пересекаться
+      const pp = orbs[o.parent].pos;
+      const R2 = (o.level === 3 ? 0.38 : 1.0) * grow;
+      const spd = o.level === 3 ? 0.85 : 0.42;
+      const incl = o.level === 3 ? 1.0 : 0.55;   // наклон плоскости
+      const node = o.level === 3 ? 2.4 : 0.9;    // поворот узла — плоскости разные
+      const th = t*spd + o.phase;
+      const ci = Math.cos(incl), si = Math.sin(incl);
+      const cN = Math.cos(node), sN = Math.sin(node);
+      const cth = Math.cos(th), sth = Math.sin(th);
+      slotPos = [
+        pp[0] + R2 * (cN*cth - sN*sth*ci),
+        pp[1] + R2 * (sth*si),
+        pp[2] + R2 * (sN*cth + cN*sth*ci),
+      ];
+    }
+    const pp = orbs[o.parent].pos;
+    o.pos = [ lerp(pp[0], slotPos[0], eb), lerp(pp[1], slotPos[1], eb), lerp(pp[2], slotPos[2], eb) ];
+
+    // характер
+    const el = o.entId && $('ent-' + o.entId);
+    const active = o.entId && S.activeEntity === o.entId;
+    const sug = el && el.classList.contains('suggested');
+    const T = o.style.tgt;
+    T.amp = active ? 0.05 : sug ? 0.045 : 0.022;
+    T.flow = active ? 1.8 : sug ? 1.4 : 0.45;
+    T.inner = active ? 0.45 : 0.18;
+    T.pulse = active ? (S.state === 'speaking' ? speechEnv + 0.1 : 0.14) : (sug ? 0.2 + 0.14*Math.sin(t*3.0) : 0.04);
+    // сигил дышит: изредка проступает; при активности — держится
+    if (active) o.sigVis = lerp(o.sigVis, 0.75, 0.03);
+    else if (sug) o.sigVis = lerp(o.sigVis, 0.9, 0.05);
+    else {
+      const cyc = Math.sin(t * 0.11 + o.phase * 3.1);
+      o.sigVis = lerp(o.sigVis, cyc > 0.86 ? 0.55 : 0.0, 0.02);
+    }
+  });
+
+  // авторасширение убрано по воле хозяина: орбы не сближаются и не разбегаются
+  // сами — непересечение обеспечено геометрией (радиусы и разведённые плоскости)
+
+  // камера
+  if (cam.focus >= 0 && cam.focus < orbs.length){
+    const fo = orbs[cam.focus];
+    cam.goalTarget = cam.focus === 0 ? [0, 0.05, 0] : fo.pos;
+  }
+  cam.target[0] = lerp(cam.target[0], cam.goalTarget[0], 0.04);
+  cam.target[1] = lerp(cam.target[1], cam.goalTarget[1], 0.04);
+  cam.target[2] = lerp(cam.target[2], cam.goalTarget[2], 0.04);
+  const fo2 = orbs[Math.max(cam.focus, 0)] || orbs[0];
+  const floor2 = (fo2 ? fo2.rad : 1) * 1.55;
+  if (cam.goalDist < floor2) cam.goalDist = floor2;
+  cam.dist = lerp(cam.dist, cam.goalDist, 0.05);
+  // инерция облёта
+  if (!dragging && (Math.abs(vyaw) > 1e-4 || Math.abs(vpitch) > 1e-4)){
+    cam.yaw += vyaw; cam.pitch = Math.min(1.2, Math.max(-1.2, cam.pitch + vpitch));
+    vyaw *= 0.94; vpitch *= 0.94;
+  }
+}
+
+/* upload + draw */
+const fPosRad = new Float32Array(MAXO*4), fStyle = new Float32Array(MAXO*4),
+      fMisc = new Float32Array(MAXO*4), fColA = new Float32Array(MAXO*3), fColB = new Float32Array(MAXO*3);
+function draw(t){
+  if (!scene) return;
+  const RES = window.innerWidth < 700 ? 0.55 : 0.72;
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.6);
+  const w = Math.round(canvas.clientWidth * dpr * RES), h = Math.round(canvas.clientHeight * dpr * RES);
+  if (canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h); }
+
+  orbs.forEach((o, i) => {
+    const c = o.style.cur, g = o.style.tgt;
+    c.flow = lerp(c.flow, g.flow, .04); c.amp = lerp(c.amp, g.amp, .05);
+    c.pulse = lerp(c.pulse, g.pulse, .28); c.inner = lerp(c.inner, g.inner, .05);
+    fPosRad.set([o.pos[0], o.pos[1], o.pos[2], o.rad], i*4);
+    fStyle.set([c.flow, c.amp, c.pulse, c.inner], i*4);
+    fMisc.set([o.k || 0.02, o.seed, o.sigil < 0 ? 0 : o.sigil, o.sigil < 0 ? 0 : o.sigVis], i*4);
+    fColA.set(o.palA, i*3); fColB.set(o.palB, i*3);
+  });
+  const b = camBasis();
+  const U = scene.U;
+  gl.uniform2f(U.u_res, w, h);
+  gl.uniform1f(U.u_time, t);
+  gl.uniform3f(U.u_camPos, b.pos[0], b.pos[1], b.pos[2]);
+  gl.uniform3f(U.u_camFwd, b.fwd[0], b.fwd[1], b.fwd[2]);
+  gl.uniform3f(U.u_camRight, b.right[0], b.right[1], b.right[2]);
+  gl.uniform3f(U.u_camUp, b.up[0], b.up[1], b.up[2]);
+  gl.uniform1i(U.u_count, orbs.length);
+  gl.uniform4fv(U.u_posRad, fPosRad);
+  gl.uniform4fv(U.u_style, fStyle);
+  gl.uniform4fv(U.u_misc, fMisc);
+  gl.uniform3fv(U.u_colA, fColA);
+  gl.uniform3fv(U.u_colB, fColB);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+/* проекция мира в экран */
+function project(b, wp){
+  const rel = [ wp[0]-b.pos[0], wp[1]-b.pos[1], wp[2]-b.pos[2] ];
+  const z = rel[0]*b.fwd[0] + rel[1]*b.fwd[1] + rel[2]*b.fwd[2];
+  if (z < 0.25) return null;
+  const x = rel[0]*b.right[0] + rel[1]*b.right[1] + rel[2]*b.right[2];
+  const y = rel[0]*b.up[0] + rel[1]*b.up[1] + rel[2]*b.up[2];
+  return {
+    x: window.innerWidth/2 + (x/z)*1.6/2 * window.innerHeight,
+    y: window.innerHeight/2 - (y/z)*1.6/2 * window.innerHeight,
+    z,
+  };
+}
+
+/* Вихрь частиц под взаимодействия (по духу Vortex): шумовое поле закручивает
+   светящиеся частицы вокруг точки события — рождение планеты, прилёт ракеты,
+   активация. Живёт на #fx (2D), недорогой, гаснет сам. */
+const vortexes = [];
+function vfbm(x, y, t){ // дешёвый закрученный шум для направления частиц
+  return Math.sin(x*1.7 + t) * Math.cos(y*1.9 - t*0.8) + 0.5*Math.sin((x+y)*2.3 + t*1.3);
+}
+function burstVortex(sx, sy, hue, n){
+  if (vortexes.length > 6) vortexes.shift();
+  const ps = [];
+  n = n || 34;
+  for (let i = 0; i < n; i++){
+    const a = Math.random()*6.283, r = Math.random()*8;
+    ps.push({ x: sx + Math.cos(a)*r, y: sy + Math.sin(a)*r,
+      vx: 0, vy: 0, life: 0, ttl: 40 + Math.random()*70,
+      rad: 0.8 + Math.random()*2.2, hue: hue + (Math.random()*40-20) });
+  }
+  vortexes.push({ cx: sx, cy: sy, ps });
+}
+function orbHue(i){ // цвет частиц от палитры планеты
+  const p = orbs[i] && orbs[i].palB; if (!p) return 210;
+  const mx = Math.max(p[0],p[1],p[2]), mn = Math.min(p[0],p[1],p[2]); if (mx===mn) return 210;
+  const d = mx-mn; let h;
+  if (mx===p[0]) h = ((p[1]-p[2])/d)%6; else if (mx===p[1]) h = (p[2]-p[0])/d+2; else h = (p[0]-p[1])/d+4;
+  return ((h*60)+360)%360;
+}
+function drawVortexes(t, dt){
+  for (let v = vortexes.length-1; v >= 0; v--){
+    const vx = vortexes[v]; let alive = 0;
+    for (const p of vx.ps){
+      if (p.life >= p.ttl) continue; alive++;
+      const ang = vfbm(p.x*0.01, p.y*0.01, t*0.6) * 3.0;      // поле закрутки
+      const tx = p.x - vx.cx, ty = p.y - vx.cy;               // тангенциальная закрутка вокруг центра
+      p.vx = lerp(p.vx, Math.cos(ang) - ty*0.02, 0.5);
+      p.vy = lerp(p.vy, Math.sin(ang) + tx*0.02, 0.5);
+      const sp = 1.4;
+      p.x += p.vx*sp; p.y += p.vy*sp; p.life++;
+      const k = 1 - p.life/p.ttl;
+      fxCtx.beginPath();
+      fxCtx.fillStyle = 'hsla(' + p.hue + ',95%,65%,' + (0.5*k) + ')';
+      fxCtx.arc(p.x, p.y, p.rad*(0.5+k), 0, 7);
+      fxCtx.fill();
+    }
+    if (!alive) vortexes.splice(v, 1);
+  }
+}
+
+/* 3D-ракеты между орбами: видно, кто кому что шлёт */
+const rockets = [];
+function launchRocket(fromEnt, toEnt, what){
+  const a = fromEnt === 'main' ? 0 : orbIdxByEnt(fromEnt);
+  const bI = toEnt === 'main' ? 0 : orbIdxByEnt(toEnt);
+  if (a < 0 || bI < 0 || a === bI || rockets.length > 8) return;
+  const nameOf = (i) => i === 0 ? 'TAIMEN' : ENTITIES[orbs[i].entId].name;
+  rockets.push({ a, b: bI, e: 0, dur: 2.6 + Math.random()*0.8,
+    side: Math.random() < 0.5 ? 1 : -1, lift: 0.3 + Math.random()*0.5, trail: [],
+    label: nameOf(a) + ' → ' + nameOf(bI) + (what ? ' · ' + what : ''), arrived: false });
+}
+const fxCv = $('fx');
+const fxCtx = fxCv ? fxCv.getContext('2d') : null;
+let lastFrameT = 0;
+function drawRockets(bas, t){
+  if (!fxCtx) return;
+  const dt = Math.min(0.05, t - lastFrameT || 0.016); lastFrameT = t;
+  if (fxCv.width !== window.innerWidth || fxCv.height !== window.innerHeight){
+    fxCv.width = window.innerWidth; fxCv.height = window.innerHeight;
+  }
+  fxCtx.clearRect(0, 0, fxCv.width, fxCv.height);
+  drawVortexes(t, dt);
+  for (let r = rockets.length - 1; r >= 0; r--){
+    const rk = rockets[r];
+    rk.e += dt / rk.dur;
+    if (rk.e >= 1){ rockets.splice(r, 1); continue; }
+    const A = orbs[rk.a], B = orbs[rk.b];
+    if (!A || !B){ rockets.splice(r, 1); continue; }
+    // вихрь-вспышка в момент прилёта ракеты к планете
+    if (!rk.arrived && rk.e > 0.9){
+      rk.arrived = true;
+      const pb = project(bas, B.pos);
+      if (pb) burstVortex(pb.x, pb.y, orbHue(rk.b), 28);
+    }
+    const e = rk.e, ease = e*e*(3 - 2*e);
+    // дуга: прямая + перпендикулярный подъём, затухающий к концам
+    const arc = Math.sin(Math.PI * ease) * rk.lift * rk.side;
+    const mid = [
+      A.pos[0] + (B.pos[0]-A.pos[0])*ease,
+      A.pos[1] + (B.pos[1]-A.pos[1])*ease + arc*0.6,
+      A.pos[2] + (B.pos[2]-A.pos[2])*ease + arc*0.4,
+    ];
+    const p = project(bas, mid);
+    if (!p) continue;
+    rk.trail.push({ x: p.x, y: p.y, z: p.z });
+    if (rk.trail.length > 22) rk.trail.shift();
+    // хвост — длиннее и ярче
+    for (let i = 0; i < rk.trail.length; i++){
+      const tp = rk.trail[i], k = i / rk.trail.length;
+      const sz = Math.max(0.8, 9 / tp.z * (0.3 + k));
+      fxCtx.beginPath();
+      fxCtx.fillStyle = 'rgba(' + (255) + ',' + Math.round(170 + 60*k) + ',' + Math.round(90 + 120*k) + ',' + (0.12 + 0.5*k) + ')';
+      fxCtx.arc(tp.x, tp.y, sz, 0, 7);
+      fxCtx.fill();
+    }
+    // корпус: капля по направлению движения — крупная, заметная
+    const prev = rk.trail[rk.trail.length - 2] || p;
+    const ang = Math.atan2(p.y - prev.y, p.x - prev.x);
+    const s = Math.max(3.5, 24 / p.z);
+    fxCtx.save();
+    fxCtx.translate(p.x, p.y); fxCtx.rotate(ang);
+    fxCtx.shadowColor = 'rgba(255,220,150,.95)'; fxCtx.shadowBlur = 14;
+    fxCtx.fillStyle = '#fff';
+    fxCtx.beginPath();
+    fxCtx.moveTo(s, 0); fxCtx.lineTo(-s*0.7, s*0.42); fxCtx.lineTo(-s*0.4, 0); fxCtx.lineTo(-s*0.7, -s*0.42);
+    fxCtx.closePath(); fxCtx.fill();
+    fxCtx.restore();
+    // подпись: кто → кому · что (парит над ракетой, тает к прилёту)
+    if (rk.label){
+      const alpha = Math.min(1, 4 / p.z) * (e < 0.85 ? 1 : (1 - e) / 0.15);
+      fxCtx.save();
+      fxCtx.font = '10px "Segoe UI", system-ui, sans-serif';
+      fxCtx.textAlign = 'center';
+      fxCtx.shadowColor = 'rgba(110,168,255,.9)'; fxCtx.shadowBlur = 8;
+      fxCtx.fillStyle = 'rgba(223,233,255,' + (0.85 * alpha) + ')';
+      fxCtx.fillText(rk.label, p.x, p.y - Math.max(10, 26 / p.z));
+      fxCtx.restore();
+    }
+  }
+}
+
+/* подписи в экранных координатах */
+function placeLabels(){
+  const b = camBasis();
+  orbs.forEach((o) => {
+    if (!o.entId) return;
+    const el = $('ent-' + o.entId); if (!el) return;
+    const wp = [ o.pos[0], o.pos[1] + o.rad*1.5, o.pos[2] ];
+    const rel = [ wp[0]-b.pos[0], wp[1]-b.pos[1], wp[2]-b.pos[2] ];
+    const z = rel[0]*b.fwd[0] + rel[1]*b.fwd[1] + rel[2]*b.fwd[2];
+    if (z < 0.3){ el.style.display = 'none'; return; }
+    const x = rel[0]*b.right[0] + rel[1]*b.right[1] + rel[2]*b.right[2];
+    const y = rel[0]*b.up[0] + rel[1]*b.up[1] + rel[2]*b.up[2];
+    el.style.display = 'block';
+    el.style.left = (window.innerWidth/2 + (x/z)*1.6/2 * window.innerHeight) + 'px';
+    el.style.top  = (window.innerHeight/2 - (y/z)*1.6/2 * window.innerHeight) + 'px';
+    el.style.opacity = String(Math.min(1, 6/z));
+  });
+}
+
+let t0 = performance.now();
+(function frame(){
+  const t = tNow();
+  tickOrbs(t);
+  draw(t);
+  placeLabels();
+  drawRockets(camBasis(), t);
+  requestAnimationFrame(frame);
+})();
+
+/* ---------- Сущности: активация, вступление ---------- */
+function toggleEntity(id){
+  const el = $('ent-' + id); if (!el) return;
+  el.classList.remove('suggested');
+  const idx = orbIdxByEnt(id);
+  if (S.activeEntity === id){
+    S.activeEntity = null;
+    el.classList.remove('active');
+    $('active-entity').style.display = 'none';
+    focusOrb(0);
+    launchRocket(id, 'main', 'вернул слово');
+    say('sys', '↩ снова говорит сам Таймень');
+  } else {
+    if (S.activeEntity){ const p = $('ent-' + S.activeEntity); if (p) p.classList.remove('active'); }
+    S.activeEntity = id;
+    el.classList.add('active');
+    const ae = $('active-entity');
+    ae.textContent = '◈ на связи: ' + ENTITIES[id].name;
+    ae.style.display = 'block';
+    if (idx > 0) focusOrb(idx);
+    launchRocket('main', id, 'передал слово');
+    if (idx >= 0){ const pp = project(camBasis(), orbs[idx].pos); if (pp) burstVortex(pp.x, pp.y, orbHue(idx), 40); } // вихрь пробуждения
+    say('sys', '◈ ' + ENTITIES[id].name + ' слушает (' + ENTITIES[id].hint + ')');
+  }
+}
+function suggestEntity(id){
+  const e = ENTITIES[id]; if (!e) return;
+  let idx = orbIdxByEnt(id);
+  if (idx < 0){
+    // рождаем недостающего: от своего родителя по родословной, иначе от главного
+    const pIdx = e.parentEnt ? Math.max(orbIdxByEnt(e.parentEnt), 0) : 0;
+    spawnOrb(id, pIdx, e.level || 1);
+    idx = orbs.length - 1;
+  }
+  const el = $('ent-' + id);
+  if (S.activeEntity !== id && el){
+    el.classList.add('suggested');
+    launchRocket('main', id, 'зову на помощь');
+    say('sys', '✦ ' + e.name + ' вступает: ' + e.hint + ' — тап по его шару, чтобы передать слово');
+    setTimeout(() => el.classList.remove('suggested'), 45000);
+  }
+  // если сейчас говорит другая сущность — младший помощник почкуется от неё
+  if (S.activeEntity && S.activeEntity !== id && orbs.length < MAXO){
+    /* дубль-почкование младших отменено: у каждого агента один орб в родословной */
+  }
+}
+
+/* ---------- Память ---------- */
+function persistLocal(){
+  try {
+    localStorage.setItem('taimen-v1', JSON.stringify({
+      notes: S.notes, knowledge: S.knowledge, voiceOut: S.voiceOut,
+      history: S.history.slice(-16), ts: Date.now(), accessKey: S.accessKey,
+      usage: S.usage, orbStats: S.orbStats, rules: S.rules, immortal: S.immortal, wishes: S.wishes,
+      orbits: S.orbits,
+    }));
+  } catch { /* ok */ }
+}
+let gitTimer = null;
+function persist(){
+  persistLocal(); updateMemUi();
+  if (!S.persistent) return;
+  clearTimeout(gitTimer);
+  gitTimer = setTimeout(() => {
+    fetch('/api/memory', {
+      method: 'POST', headers: apiHeaders(),
+      body: JSON.stringify({ data: { notes: S.notes, knowledge: S.knowledge, rules: S.rules, immortal: S.immortal, wishes: S.wishes, orbits: S.orbits, scout: S._scout, ts: Date.now() } }),
+    }).catch(() => {});
+  }, 8000);
+}
+function updateMemUi(){
+  $('memcount').textContent = String(S.notes.length + S.knowledge.length);
+  $('memmode').textContent = S.persistent ? 'git' : 'локальная';
+  const n = $('notes'); n.textContent = '';
+  if (!S.notes.length){ n.textContent = 'пока ничего'; }
+  else S.notes.forEach((note, i) => {
+    const d = document.createElement('div'); d.className = 'kitem';
+    const s = document.createElement('span'); s.textContent = '· ' + note;
+    const x = document.createElement('span'); x.className = 'kx'; x.textContent = '✕';
+    x.onclick = () => { S.notes.splice(i, 1); persist(); };
+    d.appendChild(s); d.appendChild(x); n.appendChild(d);
+  });
+  const rl = $('rules'); rl.textContent = '';
+  if (!S.rules.length){ rl.textContent = 'скажи ему «отныне…» — примет и будет жить по этому'; }
+  else S.rules.forEach((rule, i) => {
+    const d = document.createElement('div'); d.className = 'kitem';
+    const s = document.createElement('span'); s.textContent = '⚜ ' + rule;
+    const x = document.createElement('span'); x.className = 'kx'; x.textContent = '✕';
+    x.onclick = () => { S.rules.splice(i, 1); persist(); };
+    d.appendChild(s); d.appendChild(x); rl.appendChild(d);
+  });
+  const wl = $('wishes'); wl.textContent = '';
+  if (!S.wishes.length){ wl.textContent = 'скажи «хочу, чтобы ты умел…» — ночной мастер воплотит кодом'; }
+  else S.wishes.forEach((w, i) => {
+    const d = document.createElement('div'); d.className = 'kitem';
+    const s = document.createElement('span'); s.textContent = '☆ ' + w.text;
+    const x = document.createElement('span'); x.className = 'kx'; x.textContent = '✕';
+    x.onclick = () => { S.wishes.splice(i, 1); persist(); };
+    d.appendChild(s); d.appendChild(x); wl.appendChild(d);
+  });
+}
+async function loadMemory(){
+  try {
+    const local = JSON.parse(localStorage.getItem('taimen-v1') || 'null');
+    if (local){
+      S.notes = local.notes || []; S.knowledge = local.knowledge || [];
+      S.voiceOut = local.voiceOut !== false; S.history = local.history || [];
+      S.accessKey = local.accessKey || '';
+      if (local.usage) S.usage = local.usage;
+      if (local.orbStats) S.orbStats = local.orbStats;
+      if (Array.isArray(local.rules)) S.rules = local.rules;
+      if (local.immortal && local.immortal.baseTs) S.immortal = local.immortal;
+      if (Array.isArray(local.wishes)) S.wishes = local.wishes;
+      if (local.orbits && typeof local.orbits === 'object') S.orbits = local.orbits;
+    }
+    updateGauge();
+  } catch { /* ok */ }
+  try {
+    const res = await fetch('/api/memory', { headers: S.accessKey ? { 'x-taimen-key': S.accessKey } : {} });
+    if (res.ok){
+      const j = await res.json();
+      S.persistent = !!j.persistent;
+      if (j.data){
+        if (Array.isArray(j.data.notes)) S.notes = j.data.notes;
+        if (Array.isArray(j.data.knowledge)) S.knowledge = j.data.knowledge;
+        if (Array.isArray(j.data.rules)) S.rules = j.data.rules;
+        if (j.data.immortal && j.data.immortal.baseTs) S.immortal = j.data.immortal;
+        if (Array.isArray(j.data.wishes)) S.wishes = j.data.wishes;
+        // мерж, не замена: свежая ручная настройка (ещё не долетевшая в git) не затирается
+        if (j.data.orbits && typeof j.data.orbits === 'object') S.orbits = Object.assign({}, j.data.orbits, S.orbits);
+        if (j.data.scout){
+          S._scout = j.data.scout; // не перетирать труды разведчика при записи
+          if (j.data.scout.lastReport && j.data.scout.lastRun > (parseInt(localStorage.getItem('taimen-scout-seen') || '0', 10))){
+            say('sys', '🕵 ' + j.data.scout.lastReport + ' — журнал в окне Иммортала');
+            try { localStorage.setItem('taimen-scout-seen', String(j.data.scout.lastRun)); } catch { /* ok */ }
+          }
+        }
+      }
+    }
+  } catch { /* локальный запуск */ }
+  updateMemUi(); renderKnowledge();
+  $('spk').classList.toggle('on', S.voiceOut);
+}
+
+/* ---------- Знания ---------- */
+function renderKnowledge(){
+  const kl = $('klist'); kl.textContent = '';
+  S.knowledge.forEach((k, i) => {
+    const d = document.createElement('div'); d.className = 'kitem';
+    const s = document.createElement('span');
+    s.textContent = k.name + ' · ' + Math.round(k.text.length/100)/10 + 'k';
+    const x = document.createElement('span'); x.className = 'kx'; x.textContent = '✕';
+    x.onclick = () => { S.knowledge.splice(i, 1); renderKnowledge(); persist(); };
+    d.appendChild(s); d.appendChild(x); kl.appendChild(d);
+  });
+}
+function feed(name, text){
+  text = (text || '').trim();
+  if (!text) return;
+  S.knowledge.push({ id: Date.now() + Math.random(), name: name || 'фрагмент', text: text.slice(0, 20000), ts: Date.now() });
+  if (S.knowledge.length > 20) S.knowledge.shift();
+  renderKnowledge(); persist();
+  say('sys', '✦ проглочено: «' + (name || 'фрагмент') + '» — теперь Таймень это знает');
+}
+$('knowbtn').onclick = () => $('know').classList.toggle('open');
+$('kadd').onclick = () => { feed('заметка ' + new Date().toLocaleDateString('ru'), $('ktext').value); $('ktext').value = ''; };
+$('kfile').addEventListener('change', (e) => {
+  for (const f of e.target.files){
+    const r = new FileReader();
+    r.onload = () => feed(f.name, String(r.result));
+    r.readAsText(f);
+  }
+  e.target.value = '';
+});
+let dragDepth = 0;
+window.addEventListener('dragenter', (e) => { e.preventDefault(); dragDepth++; $('drop').classList.add('show'); });
+window.addEventListener('dragleave', () => { if (--dragDepth <= 0){ dragDepth = 0; $('drop').classList.remove('show'); } });
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => {
+  e.preventDefault(); dragDepth = 0; $('drop').classList.remove('show');
+  for (const f of (e.dataTransfer && e.dataTransfer.files) || []){
+    if (f.size > 300000){ say('sys', '✕ «' + f.name + '» слишком большой (лимит ~300KB)', 'sys err'); continue; }
+    const r = new FileReader();
+    r.onload = () => feed(f.name, String(r.result));
+    r.readAsText(f);
+  }
+});
+
+/* ---------- Мозг ---------- */
+function buildSystem(){
+  let sys = S.activeEntity ? ENTITIES[S.activeEntity].sys +
+    '\n\nВ конце ответа добавь тег [[mood:X]] (calm, warm, focus, excited, deep, alarm). Если задача явно по части другого помощника (strateg, analitik, pisar, hranitel) — добавь [[orb:ID]]. Долговременно важное сохраняй тегом [[note:факт]].' : TAIMEN_SYS_BASE;
+  sys += '\n\nСостояние твоей памяти сейчас: ' + (S.persistent
+    ? 'постоянная (git) — заметки переживают любой браузер.'
+    : 'ТОЛЬКО этот браузер (localStorage) — при смене устройства заметки потеряются; если зайдёт речь о памяти, посоветуй хозяину включить GITHUB_TOKEN по SETUP.md.') +
+    ' Заметок: ' + S.notes.length + '/40, материалов: ' + S.knowledge.length + '/20.';
+  if (S.rules.length) sys += '\n\nПРАВИЛА ОТ ХОЗЯИНА (соблюдай неукоснительно):\n' + S.rules.map(r => '- ' + r).join('\n');
+  if (S.activeEntity === 'immortal'){
+    sys += '\n\nТвой текущий отсчёт до LEV: ' + fmtCountdown(immortalTarget() - Date.now()) +
+      ' (цель ' + new Date(immortalTarget()).toISOString().slice(0, 10) + ').' +
+      (S.immortal.analyses.length ? ' Последние анализы:\n' +
+        S.immortal.analyses.slice(0, 5).map(a => '- [' + (a.rating >= 0 ? '+' : '') + a.rating + ', ' + a.shift + 'дн] ' + a.gist).join('\n') : '');
+  }
+  if (S.notes.length) sys += '\n\nЧто ты помнишь о хозяине и его делах:\n' + S.notes.map(n => '- ' + n).join('\n');
+  if (S.knowledge.length){
+    let budget = 6000; const chunks = [];
+    for (let i = S.knowledge.length - 1; i >= 0 && budget > 200; i--){
+      const k = S.knowledge[i];
+      const piece = k.text.slice(0, Math.min(k.text.length, budget));
+      chunks.unshift('«' + k.name + '»:\n' + piece);
+      budget -= piece.length;
+    }
+    sys += '\n\nМатериалы, которые тебе скормили (опирайся на них при ответах):\n' + chunks.join('\n---\n');
+  }
+  return sys;
+}
+/* скорость vs глубина: бытовые вопросы летят через Sonnet 5 (секунды),
+   глубокие — через Fable 5 (думает дольше, отвечает мощнее).
+   Форсировать глубину: начни сообщение со слова «подумай». */
+function pickMainModel(messages){
+  const last = String((messages[messages.length - 1] || {}).content || '');
+  const deep = last.length > 220 ||
+    /^подумай|глубок|сложн|проанализ|разложи|спланируй|стратеги|философ|смысл|прими решение/i.test(last);
+  return deep ? 'claude-fable-5' : 'claude-sonnet-5';
+}
+async function callBrain(messages, opts){
+  // иерархия разума: Таймень — Fable 5/Sonnet 5 по глубине, свита — Opus 4.8, суб-задачи — Sonnet 5
+  const model = (opts && opts.model) ||
+    (S.activeEntity ? (ENTITIES[S.activeEntity].model || 'claude-opus-4-8') : pickMainModel(messages));
+  const res = await fetch('/api/chat', {
+    method: 'POST', headers: apiHeaders(),
+    body: JSON.stringify({
+      messages, system: (opts && opts.system) || buildSystem(),
+      model,
+      entity: S.activeEntity || undefined, // свите руки не даём — только главному разуму
+      max_tokens: (opts && opts.max_tokens) || (S.activeEntity ? 900 : (model === 'claude-fable-5' ? 1600 : 700)),
+    }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || ('ошибка ' + res.status));
+  addUsage(j.model || 'claude-opus-4-8', j.usage, (opts && opts.speaker) || (S.activeEntity || 'taimen'));
+  if (j.budget) { S.serverBudget = j.budget; updateGauge(); }
+  // след рук Тайменя: видно, к кому летали посольства и куда ходил в сеть
+  if (Array.isArray(j.trace)){
+    j.trace.forEach((t, k) => {
+      if (t.tool === 'ask_planet' && ENTITIES[t.id]){
+        setTimeout(() => {
+          launchRocket('main', t.id, 'вопрос');
+          setTimeout(() => launchRocket(t.id, 'main', 'ответ'), 1700);
+        }, k * 600);
+        say('sys', '🪐 Таймень спросил ' + ENTITIES[t.id].name + (t.q ? ': ' + t.q : ''));
+      } else if (t.tool === 'fetch_url'){
+        let host = t.url || '';
+        try { host = new URL(t.url).hostname; } catch { /* как есть */ }
+        say('sys', '🌐 Таймень сходил в сеть: ' + host);
+      }
+    });
+  }
+  return j.text || '';
+}
+function parseTags(text){
+  const out = { text, mood: null, orb: null, notes: [] };
+  out.rules = [];
+  out.text = text.replace(/\[\[note:\s*([^\]]{3,200})\]\]/g, (_, note) => {
+    out.notes.push(note.trim());
+    return '';
+  });
+  out.text = out.text.replace(/\[\[rule:\s*([^\]]{3,200})\]\]/g, (_, rule) => {
+    out.rules.push(rule.trim());
+    return '';
+  });
+  out.wishes = [];
+  out.text = out.text.replace(/\[\[wish:\s*([^\]]{3,300})\]\]/g, (_, w) => {
+    out.wishes.push(w.trim());
+    return '';
+  });
+  out.text = out.text.replace(/\[\[(mood|orb):\s*([a-zA-Z_]+)\s*\]\]/g, (_, kind, val) => {
+    if (kind === 'mood' && MOODS[val]) out.mood = val;
+    if (kind === 'orb' && ENTITIES[val]) out.orb = val;
+    return '';
+  }).trim();
+  return out;
+}
+
+let busy = false;
+async function sendMessage(text){
+  text = (text || '').trim();
+  if (!text || busy) return;
+  // наведение: «покажи иммортала», «приблизь шпиона», «покажи всех»
+  const nav = text.match(/^(покажи|наведись на|приблизь|открой)\s+(.+)$/i);
+  if (nav){
+    const q = nav[2].toLowerCase();
+    const MAPN = { 'иммортал': 'immortal', 'иммортис': 'immortal',
+      'шпион': 'shpion', 'спекулятор': 'shpion',
+      'стратег': 'strateg', 'тактик': 'taktik',
+      'аналитик': 'analitik', 'писар': 'pisar', 'скриптор': 'pisar',
+      'хранител': 'hranitel', 'кустодес': 'hranitel',
+      'прогрессор': 'progressor', 'банк': 'bank', 'фискатор': 'bank', 'таймен': 'main' };
+    let done = false;
+    if (/^(всех|все|систему|общий план|карту)/.test(q)){
+      hideInfo(); cam.focus = 0; cam.goalTarget = [0, 0.05, 0]; cam.goalDist = 9.5;
+      say('sys', '🔭 общий план'); done = true;
+    } else {
+      for (const k of Object.keys(MAPN)){
+        if (q.startsWith(k)){
+          const idx = MAPN[k] === 'main' ? 0 : orbIdxByEnt(MAPN[k]);
+          if (idx < 0){ say('sys', '✕ ' + nav[2] + ' ещё не родился'); }
+          else { showInfo(idx); if (idx === 0){ cam.focus = 0; cam.goalTarget = [0, 0.05, 0]; cam.goalDist = 3.4; } say('sys', '◎ навёлся: ' + (idx === 0 ? 'TAIMEN' : ENTITIES[MAPN[k]].name)); }
+          done = true; break;
+        }
+      }
+    }
+    if (done) return;
+  }
+
+  // ввод пароля прямо в чате: «пароль моёслово»
+  const pw = text.match(/^пароль[\s:]+(.+)$/i);
+  if (pw){
+    S.accessKey = pw[1].trim();
+    persistLocal();
+    say('sys', '🔑 пароль запомнен на этом устройстве — повтори свой вопрос');
+    loadMemory();
+    return;
+  }
+  busy = true;
+  $('send').textContent = '◌'; $('send').disabled = true;
+  say('user', text);
+  S.history.push({ role: 'user', content: text });
+  S.userTurns++;
+  setStatus('thinking');
+  try {
+    const reply = await callBrain(S.history.slice(-16));
+    const p = parseTags(reply);
+    if (p.mood) S.mood = MOODS[p.mood];
+    S.history.push({ role: 'assistant', content: reply });
+    say(S.activeEntity ? 'ent' : 'taimen', p.text, 'taimen');
+    const st = S.orbStats[S.activeEntity || 'taimen'];
+    if (st){ st.last = p.text.slice(0, 160); st.ts = Date.now(); }
+    // самосохранение: Таймень сам решил, что это стоит помнить
+    for (const note of p.notes){
+      if (!S.notes.some(n => n.toLowerCase() === note.toLowerCase())){
+        S.notes.push(note);
+        launchRocket('main', 'hranitel', 'заметка в память');
+        say('sys', '⛬ запомнил: ' + note);
+      }
+    }
+    while (S.notes.length > 40) S.notes.shift();
+    // правила хозяина — Таймень принял и будет так жить
+    for (const rule of p.rules){
+      if (!S.rules.some(r => r.toLowerCase() === rule.toLowerCase())){
+        S.rules.push(rule);
+        say('sys', '⚜ принял правило: ' + rule);
+      }
+    }
+    while (S.rules.length > 20) S.rules.shift();
+    // книга пожеланий: ночной мастер заберёт и воплотит кодом
+    for (const w of p.wishes){
+      if (!S.wishes.some(x => x.text.toLowerCase() === w.toLowerCase())){
+        S.wishes.push({ text: w, ts: Date.now() });
+        launchRocket('main', 'strateg', 'пожелание в книгу');
+        say('sys', '☆ в книгу пожеланий: ' + w + ' — ночной мастер возьмётся');
+      }
+    }
+    while (S.wishes.length > 30) S.wishes.shift();
+    if (p.orb) suggestEntity(p.orb);
+    speak(p.text);
+    if (S.userTurns % 6 === 0) distill();
+  } catch (e) {
+    const msg = (e && e.message) || 'связь прервалась';
+    if (/паролем/.test(msg)){
+      say('sys', '🔒 Таймень закрыт. Напиши в чат: пароль ТВОЁСЛОВО');
+    } else {
+      S.mood = MOODS.alarm;
+      say('sys', '✕ ' + msg, 'sys err');
+      setTimeout(() => { S.mood = MOODS.calm; setStatus(S.state); }, 4000);
+    }
+  } finally {
+    busy = false;
+    $('send').textContent = '➤'; $('send').disabled = false;
+    if (S.state === 'thinking') setStatus('idle');
+    persist();
+  }
+}
+
+async function distill(){
+  try {
+    const transcript = S.history.slice(-12).map(m => (m.role === 'user' ? 'Хозяин: ' : 'Таймень: ') + m.content).join('\n');
+    const out = await callBrain(
+      [{ role: 'user', content: transcript }],
+      {
+        model: 'claude-sonnet-5', max_tokens: 300,
+        system: 'Из диалога выдели до 4 коротких долговременных фактов о пользователе, его делах и предпочтениях — по одному в строке, без нумерации и пояснений. Уже известное не повторяй. Известно:\n' +
+          S.notes.map(n => '- ' + n).join('\n') + '\nЕсли нового нет — ответь одним словом: ПУСТО.',
+      }
+    );
+    if (/^пусто/i.test(out.trim())) return;
+    for (let line of out.split('\n')){
+      line = line.replace(/^[-•·\s]+/, '').trim();
+      if (line.length > 5 && line.length < 200 && !S.notes.some(n => n.toLowerCase() === line.toLowerCase())){
+        S.notes.push(line);
+      }
+    }
+    while (S.notes.length > 40) S.notes.shift();
+    persist();
+  } catch { /* фон */ }
+}
+
+/* ---------- Слух ---------- */
+const SRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recog = null, audioCtx = null, analyser = null, micStream = null;
+if (!SRec) { $('mic').style.display = 'none'; }
+async function micMeterOn(){
+  try {
+    if (!navigator.mediaDevices) return;
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (S.state !== 'listening'){ stream.getTracks().forEach(tr => tr.stop()); return; }
+    micStream = stream;
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    const src = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser(); analyser.fftSize = 512;
+    src.connect(analyser);
+    const buf = new Uint8Array(analyser.fftSize);
+    (function meter(){
+      if (!analyser) return;
+      analyser.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++){ const d = (buf[i] - 128) / 128; sum += d * d; }
+      micLevel = Math.min(1, Math.sqrt(sum / buf.length) * 4);
+      requestAnimationFrame(meter);
+    })();
+  } catch { /* только текст */ }
+}
+function micMeterOff(){
+  micLevel = 0; analyser = null;
+  if (micStream){ micStream.getTracks().forEach(tr => tr.stop()); micStream = null; }
+}
+function startListening(){
+  if (!SRec || S.state === 'listening') return;
+  try { window.speechSynthesis && speechSynthesis.cancel(); } catch { /* ok */ }
+  if (cloudAudio){ try { cloudAudio.pause(); } catch { /* ok */ } } // не говорить себе в микрофон
+  recog = new SRec();
+  recog.lang = 'ru-RU'; recog.interimResults = true; recog.continuous = false;
+  let finalText = '';
+  // ВАЖНО: во время распознавания НЕ трогаем getUserMedia — на Android Chrome
+  // второй захват микрофона убивает SpeechRecognition. Пульс орба — из событий.
+  recog.onsoundstart = () => { micLevel = 0.5; };
+  recog.onresult = (e) => {
+    micLevel = 0.55 + Math.random() * 0.35; // орб дышит в такт услышанному
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++){
+      if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    $('inp').placeholder = interim || finalText || 'слушаю…';
+    const h = $('hearing');
+    h.textContent = (finalText + ' ' + interim).trim();
+    h.classList.toggle('show', !!h.textContent);
+  };
+  recog.onerror = (e) => {
+    const code = e && e.error;
+    const why =
+      code === 'not-allowed' || code === 'service-not-allowed'
+        ? '🎙 нет доступа к микрофону — разреши его для этого сайта (замочек в адресной строке)'
+      : code === 'no-speech' ? '🎙 не расслышал — нажми и говори сразу'
+      : code === 'audio-capture' ? '🎙 микрофон занят другим приложением или не найден'
+      : code === 'network' ? '🎙 распознавание недоступно: нужен интернет'
+      : code === 'aborted' ? ''
+      : '🎙 распознавание не сработало (' + (code || '?') + ')';
+    if (why) say('sys', why);
+    stopListening();
+  };
+  recog.onend = () => {
+    stopListening();
+    if (finalText.trim()) sendMessage(finalText);
+  };
+  setStatus('listening');
+  $('mic').classList.add('rec');
+  try { recog.start(); } catch { stopListening(); }
+}
+function stopListening(){
+  $('mic').classList.remove('rec');
+  $('inp').placeholder = 'скажи или напиши…';
+  $('hearing').classList.remove('show'); $('hearing').textContent = '';
+  micMeterOff();
+  if (S.state === 'listening') setStatus('idle');
+  if (recog){ try { recog.onend = null; recog.stop(); } catch { /* ok */ } recog = null; }
+}
+$('mic').onclick = () => (S.state === 'listening' ? stopListening() : startListening());
+
+/* ---------- Речь ---------- */
+let ruVoice = null;
+function pickVoice(){
+  if (!window.speechSynthesis) return;
+  const vs = speechSynthesis.getVoices() || [];
+  ruVoice = vs.find(v => /ru/i.test(v.lang) && /милена|milena|dmitry|yuri|google/i.test(v.name)) ||
+            vs.find(v => /ru/i.test(v.lang)) || null;
+}
+if (window.speechSynthesis){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+// у каждого орба свой голос — по назначению (браузерный синтез: тон/темп; облако: свой тембр)
+const VOICE_CHAR = {
+  main:     { pitch: 0.75, rate: 0.97 }, // дух глубин — низкий, размеренный
+  strateg:  { pitch: 0.90, rate: 1.06 }, // собранный, чуть быстрее
+  analitik: { pitch: 1.12, rate: 1.12 }, // точный, скорый
+  pisar:    { pitch: 1.00, rate: 0.94 }, // тёплый рассказчик
+  hranitel: { pitch: 0.62, rate: 0.88 }, // старый бас, никуда не спешит
+  shpion:   { pitch: 1.05, rate: 1.18 }, // быстрый, вкрадчивый
+  immortal: { pitch: 1.30, rate: 0.85 }, // неземной, тянет слова
+  progressor:{ pitch: 0.85, rate: 0.93 }, // зрелый, взвешенный
+  bank:     { pitch: 0.95, rate: 1.02 }, // сухой, деловой
+  taktik:   { pitch: 0.92, rate: 1.14 }, // командный, быстрый
+};
+// облачный голос глубин (/api/tts, ElevenLabs); 501/404 = не подключён, больше не пробуем
+let cloudVoiceOk = true;
+let cloudAudio = null;
+async function speakCloud(clean, speaker){
+  if (!cloudVoiceOk) return false;
+  try {
+    const res = await fetch('/api/tts', { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ text: clean, orb: speaker }) });
+    if (res.status === 501 || res.status === 404){ cloudVoiceOk = false; return false; } // голос не подключён — не долбим
+    if (!res.ok) return false;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    if (cloudAudio){ try { cloudAudio.pause(); } catch { /* ok */ } }
+    const a = cloudAudio = new Audio(url);
+    return await new Promise((resolve) => {
+      let pulse = null;
+      const finish = (ok) => {
+        clearInterval(pulse); speechEnv = 0;
+        if (S.state === 'speaking') setStatus('idle');
+        URL.revokeObjectURL(url); resolve(ok);
+      };
+      a.onplay = () => {
+        setStatus('speaking'); speechEnv = 0.5;
+        pulse = setInterval(() => { if (!a.paused) speechEnv = 0.4 + Math.random() * 0.4; }, 140);
+      };
+      a.onended = () => finish(true);
+      a.onerror = () => finish(false);
+      a.play().catch(() => finish(false));
+    });
+  } catch { return false; }
+}
+function speakLocal(clean, speaker){
+  if (!window.speechSynthesis){ if (S.state === 'thinking' || S.state === 'speaking') setStatus('idle'); return; }
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    if (ruVoice) u.voice = ruVoice;
+    const ch = VOICE_CHAR[speaker] || VOICE_CHAR.main;
+    u.lang = 'ru-RU'; u.rate = ch.rate; u.pitch = ch.pitch;
+    u.onstart = () => { setStatus('speaking'); speechEnv = 0.5; };
+    u.onboundary = () => { speechEnv = 0.45 + Math.random() * 0.35; };
+    u.onend = () => { speechEnv = 0; if (S.state === 'speaking') setStatus('idle'); };
+    u.onerror = () => { speechEnv = 0; if (S.state === 'speaking') setStatus('idle'); };
+    speechSynthesis.speak(u);
+  } catch { setStatus('idle'); }
+}
+function speak(text, speaker){
+  if (!S.voiceOut || !text){ if (S.state === 'thinking' || S.state === 'speaking') setStatus('idle'); return; }
+  speaker = speaker || S.activeEntity || 'main';
+  const clean = text.replace(/[*_#\`>\[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 600);
+  if (!clean){ if (S.state === 'thinking' || S.state === 'speaking') setStatus('idle'); return; }
+  speakCloud(clean, speaker).then((ok) => { if (!ok) speakLocal(clean, speaker); });
+}
+
+$('spk').onclick = () => {
+  S.voiceOut = !S.voiceOut;
+  $('spk').classList.toggle('on', S.voiceOut);
+  if (!S.voiceOut){
+    try { speechSynthesis.cancel(); } catch { /* ok */ }
+    if (cloudAudio){ try { cloudAudio.pause(); } catch { /* ok */ } }
+  }
+  persist();
+};
+
+/* ---------- Ввод ---------- */
+$('send').onclick = () => { const v = $('inp').value.trim(); if (v && !busy){ sendMessage(v); $('inp').value = ''; } };
+$('inp').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter'){ const v = $('inp').value.trim(); if (v && !busy){ sendMessage(v); $('inp').value = ''; } }
+});
+
+/* экранная клавиатура: поднимаем строку ввода над ней (iOS/фолбэк) */
+if (window.visualViewport){
+  visualViewport.addEventListener('resize', () => {
+    const kb = Math.max(0, innerHeight - visualViewport.height - visualViewport.offsetTop);
+    $('chat').style.bottom = kb > 0 ? (16 + kb) + 'px' : '';
+  });
+}
+
+/* ---------- Штурвал: управление одним пальцем по дереву команд ----------
+   Прижал рукоять — веером вылетают команды; ведёшь палец (не отпуская) —
+   ветки раскрываются, орбы подсматриваются камерой; отпустил на листе —
+   исполнилось; отпустил в пустоте — всё сложилось обратно. Работает и мышью. */
+const HELM_TREE = [
+  { icon: '⦿', label: 'ОРБЫ', kids: [
+    { icon: '◉', label: 'TAIMEN',    orb: 'main' },
+    { icon: '✴', label: 'СТРАТЕГОРУМ',   orb: 'strateg' },
+    { icon: '❖', label: 'АНАЛИТИКУМ',  orb: 'analitik' },
+    { icon: '✎', label: 'СКРИПТОРУМ',    orb: 'pisar' },
+    { icon: '⛬', label: 'КУСТОДЕС', orb: 'hranitel' },
+    { icon: '◐', label: 'СПЕКУЛЯТОР',     orb: 'shpion' },
+    { icon: '⧖', label: 'ИММОРТИС',  orb: 'immortal' },
+    { icon: '⟁', label: 'ПРОГРЕССОРУМ', orb: 'progressor' },
+    { icon: '⚔', label: 'ТАКТИКОРУМ',  orb: 'taktik' },
+    { icon: '⛃', label: 'ФИСКАТОРУМ',      orb: 'bank' },
+  ] },
+  { icon: '◈', label: 'ВИД', kids: [
+    { icon: '⌂', label: 'ДОМОЙ', act: () => { hideInfo(); cam.focus = 0; cam.goalTarget = [0, 0.05, 0]; cam.goalDist = 5.4; say('sys', '⌂ домой'); } },
+    { icon: '∞', label: 'ВСЯ СИСТЕМА', act: () => { hideInfo(); cam.focus = 0; cam.goalTarget = [0, 0.05, 0]; cam.goalDist = 9.5; say('sys', '🔭 общий план'); } },
+  ] },
+  { icon: '🎙', label: 'ГОЛОС',  act: () => startListening() },
+  { icon: '✦', label: 'ЗНАНИЯ', act: () => $('know').classList.toggle('open') },
+  { icon: '🔊', label: 'ЗВУК',   act: () => $('spk').click() },
+];
+
+const helmEl = $('helm');
+let helmNodes = [];              // {el, x, y, def, depth, expanded}
+let helmHover = null, helmDwell = null, helmPrevCam = null, helmPid = null, helmT0 = 0;
+
+function helmClampXY(x, y){
+  return [ Math.min(Math.max(x, 34), innerWidth - 34), Math.min(Math.max(y, 44), innerHeight - 50) ];
+}
+function helmSpawn(def, x, y, depth, delay){
+  const el = document.createElement('div');
+  el.className = 'helmnode';
+  el.innerHTML = '<span>' + def.icon + '</span><span class="hl">' + def.label + '</span>';
+  el.style.left = x + 'px'; el.style.top = y + 'px';
+  document.body.appendChild(el);
+  const tmr = setTimeout(() => el.classList.add('in'), 16 + delay);
+  helmNodes.push({ el, x, y, def, depth, expanded: false, tmr });
+}
+function helmFan(defs, cx, cy, baseAng, depth){
+  const R = defs.length > 5 ? 108 : 92;
+  const gap = defs.length > 1 ? Math.min(0.62, 2.9 / (defs.length - 1)) : 0;
+  const start = baseAng - gap * (defs.length - 1) / 2;
+  const pts = defs.map((d, i) => {
+    const [x, y] = helmClampXY(cx + Math.cos(start + gap * i) * R, cy + Math.sin(start + gap * i) * R);
+    return { x, y };
+  });
+  // расталкивание: после прижатия к краю экрана узлы не липнут друг к другу,
+  // к уже висящим веткам и к рукояти
+  const [hx, hy] = helmHandleXY();
+  const fixed = helmNodes.map(n => ({ x: n.x, y: n.y })).concat([{ x: hx, y: hy }]);
+  for (let it = 0; it < 30; it++){
+    let moved = false;
+    for (let i = 0; i < pts.length; i++){
+      const others = fixed.concat(pts.filter((_, j) => j !== i));
+      for (const q of others){
+        const dx = pts[i].x - q.x, dy = pts[i].y - q.y;
+        const d = Math.hypot(dx, dy);
+        if (d < 60 && d > 0.001){
+          const push = (60 - d) / 2;
+          pts[i].x += dx / d * push; pts[i].y += dy / d * push;
+          moved = true;
+        } else if (d <= 0.001){ pts[i].x += 9; pts[i].y -= 9; moved = true; }
+      }
+      const c = helmClampXY(pts[i].x, pts[i].y);
+      pts[i].x = c[0]; pts[i].y = c[1];
+    }
+    if (!moved) break;
+  }
+  defs.forEach((d, i) => helmSpawn(d, pts[i].x, pts[i].y, depth, i * 28));
+}
+function helmHandleXY(){
+  const r = helmEl.getBoundingClientRect();
+  return [r.left + r.width / 2, r.top + r.height / 2];
+}
+function helmKill(n){ clearTimeout(n.tmr); n.el.classList.remove('in'); setTimeout(() => n.el.remove(), 240); }
+function helmExpand(n){
+  helmNodes = helmNodes.filter(k => { if (k.depth > n.depth){ helmKill(k); return false; } return true; });
+  // соседняя ветка сворачивается — её можно раскрыть снова
+  helmNodes.forEach(k => { if (k.depth === n.depth && k !== n) k.expanded = false; });
+  helmNodes.forEach(k => k.el.classList.toggle('dim', k.depth === n.depth && k !== n));
+  const [hx, hy] = helmHandleXY();
+  helmFan(n.def.kids, n.x, n.y, Math.atan2(n.y - hy, n.x - hx), n.depth + 1);
+  n.expanded = true;
+  popSound();
+}
+function helmPreview(n){
+  const idx = n.def.orb === 'main' ? 0 : orbIdxByEnt(n.def.orb);
+  if (idx < 0) return;
+  if (!helmPrevCam) helmPrevCam = { focus: cam.focus, dist: cam.goalDist, tgt: cam.goalTarget.slice() };
+  cam.focus = idx;
+  cam.goalDist = idx === 0 ? 4.2 : Math.max(0.9, orbs[idx].rad * 6.0);
+}
+function helmUnpreview(){
+  if (!helmPrevCam) return;
+  cam.focus = helmPrevCam.focus; cam.goalDist = helmPrevCam.dist; cam.goalTarget = helmPrevCam.tgt;
+  helmPrevCam = null;
+}
+function helmNearest(x, y){
+  let best = null, bd = 52 * 52;
+  for (const n of helmNodes){
+    const dx = n.x - x, dy = n.y - y, d = dx * dx + dy * dy;
+    if (d < bd){ bd = d; best = n; }
+  }
+  return best;
+}
+function helmSetHover(n){
+  if (helmHover === n) return;
+  if (helmHover){
+    helmHover.el.classList.remove('hover');
+    if (helmHover.def.orb) helmUnpreview();
+  }
+  clearTimeout(helmDwell); helmDwell = null;
+  helmHover = n;
+  if (!n) return;
+  n.el.classList.add('hover');
+  if (n.def.kids && !n.expanded) helmDwell = setTimeout(() => helmExpand(n), 130);
+  if (n.def.orb) helmPreview(n);
+}
+function helmExec(n){
+  const d = n.def;
+  if (d.orb){
+    const idx = d.orb === 'main' ? 0 : orbIdxByEnt(d.orb);
+    if (idx < 0){ helmUnpreview(); say('sys', '✕ ' + d.label + ' ещё не родился'); }
+    else { helmPrevCam = null; showInfo(idx); say('sys', '◎ навёлся: ' + d.label); }
+  } else if (d.act){ helmUnpreview(); d.act(); }
+  popSound();
+}
+function helmClose(execute){
+  clearTimeout(helmDwell); helmDwell = null;
+  const h = helmHover;
+  if (helmHover){ helmHover.el.classList.remove('hover'); helmHover = null; }
+  helmNodes.forEach(helmKill); helmNodes = [];
+  helmEl.classList.remove('armed');
+  if (execute && h && !h.def.kids) helmExec(h);
+  else helmUnpreview();
+}
+helmEl.addEventListener('pointerdown', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  if (helmPid !== null) return; // жест уже идёт — второй палец не крадёт штурвал
+  wakeUi(); sndInit();
+  helmPid = e.pointerId; helmT0 = performance.now();
+  try { helmEl.setPointerCapture(e.pointerId); } catch { /* ok */ }
+  helmEl.classList.add('armed');
+  const [hx, hy] = helmHandleXY();
+  helmFan(HELM_TREE, hx, hy, -Math.PI * 0.30, 0);
+});
+helmEl.addEventListener('pointermove', (e) => {
+  if (helmPid === null || e.pointerId !== helmPid) return;
+  helmSetHover(helmNearest(e.clientX, e.clientY));
+});
+const helmUp = (e) => {
+  if (helmPid === null || e.pointerId !== helmPid) return;
+  helmPid = null;
+  const quickTap = e.type === 'pointerup' && !helmHover && performance.now() - helmT0 < 300;
+  helmClose(e.type === 'pointerup');
+  if (quickTap && !S.helmHinted){
+    S.helmHinted = true;
+    say('sys', '⎈ штурвал: прижми и, не отпуская, веди палец по веткам; отпусти на выбранном');
+  }
+};
+helmEl.addEventListener('pointerup', helmUp);
+helmEl.addEventListener('pointercancel', helmUp);
+
+/* ---------- Жизнь начинается сама: заставка -> (новости) -> разлёт ---------- */
+let lifeStarted = false;
+function beginLife(){
+  if (lifeStarted) return;
+  lifeStarted = true;
+  S.booted = true;
+  setStatus('idle');
+  // взрывное почкование: вся свита разом, следом родословная; камера отъезжает,
+  // чтобы видеть всю систему, и возвращается после разлёта
+  const burst = 500;
+  setTimeout(() => { boomSound(); cam.goalDist = 11.0; }, burst);
+  ENT_ORDER.forEach((id, i) => setTimeout(() => spawnOrb(id, 0, 1), burst + i * 240));
+  setTimeout(() => { const p = orbIdxByEnt('strateg'); if (p > 0) spawnOrb('shpion', p, 2); }, burst + 1900);
+  setTimeout(() => { const p = orbIdxByEnt('shpion'); if (p > 0) spawnOrb('immortal', p, 3); }, burst + 3400);
+  setTimeout(() => { if (cam.focus <= 0) cam.goalDist = 5.8; }, burst + 12000);
+  // восстановить хвост прошлой беседы — продолжаем с того же места
+  for (const m of S.history.slice(-6)){
+    say(m.role === 'user' ? 'user' : 'taimen', parseTags(m.content).text);
+  }
+  const greeting = S.history.length
+    ? 'Я вынырнул. Помню, о чём мы говорили — продолжай.'
+    : 'Я здесь. Смотри — свита рождается из меня. Говори вслух или пиши.';
+  say('taimen', greeting);
+  speak(greeting); // без жеста браузер может промолчать — текст всё равно есть
+}
+
+// звук и синтез готовим при первом же касании (правила автоплея браузеров)
+window.addEventListener('pointerdown', function once(){
+  sndInit();
+  if (window.speechSynthesis){
+    try { const u = new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); } catch { /* ok */ }
+  }
+  window.removeEventListener('pointerdown', once);
+}, { once: true });
+
+setStatus('idle');
+loadMemory().then(() => {
+  setTimeout(() => {
+    $('boot').classList.add('gone');
+    let seen = '';
+    try { seen = localStorage.getItem('taimen-ver') || ''; } catch { /* ok */ }
+    if (seen !== APP_VERSION) showUpdateNews(beginLife); // разлёт — после закрытия новостей
+    else setTimeout(beginLife, 600);
+  }, 1600);
+});
+
+/* звук глубин: гул рождения и щелчки почкования */
+let sndCtx = null;
+function sndInit(){
+  try {
+    sndCtx = sndCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (sndCtx.state === 'suspended') sndCtx.resume();
+  } catch { /* без звука */ }
+}
+function boomSound(){
+  if (!sndCtx) return;
+  try {
+    const dur = 1.6, sr = sndCtx.sampleRate;
+    const buf = sndCtx.createBuffer(1, sr * dur, sr), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2.2);
+    const src = sndCtx.createBufferSource(); src.buffer = buf;
+    const f = sndCtx.createBiquadFilter(); f.type = 'lowpass';
+    f.frequency.setValueAtTime(340, sndCtx.currentTime);
+    f.frequency.exponentialRampToValueAtTime(45, sndCtx.currentTime + dur);
+    const g = sndCtx.createGain();
+    g.gain.setValueAtTime(0.55, sndCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, sndCtx.currentTime + dur);
+    src.connect(f); f.connect(g); g.connect(sndCtx.destination); src.start();
+  } catch { /* ok */ }
+}
+function popSound(){
+  // мягкий блик подтверждения (штурвал/захват) — без шумового стука
+  if (!sndCtx) return;
+  try {
+    const t = sndCtx.currentTime;
+    const o = sndCtx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(760, t);
+    o.frequency.exponentialRampToValueAtTime(390, t + 0.11);
+    const g = sndCtx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.06, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    o.connect(g); g.connect(sndCtx.destination); o.start(t); o.stop(t + 0.15);
+  } catch { /* ok */ }
+}
+// разделение почки: студийный файл sounds/birth.wav (натяжение -> бульк -> пузырьки),
+// при недоступности — синтез тем же характером. Синхронизирован с отрывом шейки.
+let lastTearAt = -10;
+function tearSound(){
+  const now = performance.now() / 1000;
+  if (now - lastTearAt < 1.0) return; // залповый старт: не наслаивать
+  lastTearAt = now;
+  try {
+    const a = new Audio('sounds/birth.wav');
+    a.volume = 0.6;
+    a.play().catch(() => tearSynth());
+  } catch { tearSynth(); }
+}
+function tearSynth(){
+  if (!sndCtx) return;
+  try {
+    const t = sndCtx.currentTime;
+    // натяжение: тёплый тихий тон с лёгкой дрожью поднимается — тянется
+    const o1 = sndCtx.createOscillator(); o1.type = 'sine';
+    o1.frequency.setValueAtTime(150, t);
+    o1.frequency.exponentialRampToValueAtTime(320, t + 0.82);
+    const wob = sndCtx.createOscillator(); wob.frequency.value = 6.5;
+    const wg = sndCtx.createGain(); wg.gain.value = 7;
+    wob.connect(wg); wg.connect(o1.frequency);
+    const g1 = sndCtx.createGain();
+    g1.gain.setValueAtTime(0.0001, t);
+    g1.gain.linearRampToValueAtTime(0.035, t + 0.45);
+    g1.gain.linearRampToValueAtTime(0.05, t + 0.8);
+    g1.gain.linearRampToValueAtTime(0.0001, t + 0.88);
+    o1.connect(g1); g1.connect(sndCtx.destination);
+    o1.start(t); o1.stop(t + 0.9); wob.start(t); wob.stop(t + 0.9);
+    // отрыв: округлый бульк — быстрый глиссандо вниз с мягкой атакой
+    const bl = sndCtx.createOscillator(); bl.type = 'sine';
+    bl.frequency.setValueAtTime(560, t + 0.84);
+    bl.frequency.exponentialRampToValueAtTime(170, t + 1.02);
+    const g2 = sndCtx.createGain();
+    g2.gain.setValueAtTime(0.0001, t + 0.84);
+    g2.gain.linearRampToValueAtTime(0.09, t + 0.87);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 1.08);
+    bl.connect(g2); g2.connect(sndCtx.destination); bl.start(t + 0.84); bl.stop(t + 1.1);
+    // тихое эхо-бульк октавой ниже — масса качнулась
+    const b2 = sndCtx.createOscillator(); b2.type = 'sine';
+    b2.frequency.setValueAtTime(300, t + 1.0);
+    b2.frequency.exponentialRampToValueAtTime(110, t + 1.2);
+    const g3 = sndCtx.createGain();
+    g3.gain.setValueAtTime(0.0001, t + 1.0);
+    g3.gain.linearRampToValueAtTime(0.04, t + 1.03);
+    g3.gain.exponentialRampToValueAtTime(0.001, t + 1.28);
+    b2.connect(g3); g3.connect(sndCtx.destination); b2.start(t + 1.0); b2.stop(t + 1.3);
+  } catch { /* ok */ }
+}
+
+/* новости версии: астероиды замедляются к центру, где висит «что нового» */
+function showUpdateNews(cb){
+  let seen = '';
+  try { seen = localStorage.getItem('taimen-ver') || ''; } catch { /* ok */ }
+  if (seen === APP_VERSION){ if (cb) cb(); return; }
+  const ov = document.createElement('div'); ov.id = 'news';
+  const card = document.createElement('div'); card.id = 'newscard'; card.className = 'glass';
+  card.innerHTML = '<h2>TAIMEN ОБНОВИЛСЯ</h2><div class="ver">версия ' + APP_VERSION + ' · что нового:</div>' +
+    '<ul>' + WHATS_NEW.map(w => '<li>' + w + '</li>').join('') + '</ul>' +
+    '<button class="btn" id="news-ok">поплыли ➤</button>';
+  ov.appendChild(card);
+
+  const asts = [];
+  for (let i = 0; i < 14; i++){
+    const el = document.createElement('div'); el.className = 'ast';
+    const size = 6 + Math.random() * 22;
+    el.style.width = el.style.height = size + 'px';
+    ov.appendChild(el);
+    const edge = Math.floor(Math.random() * 4);
+    const W = window.innerWidth, H = window.innerHeight;
+    const start = edge === 0 ? [-40, Math.random() * H] : edge === 1 ? [W + 40, Math.random() * H]
+                : edge === 2 ? [Math.random() * W, -40] : [Math.random() * W, H + 40];
+    const aim = [ W/2 + (Math.random() - .5) * W * .5, H/2 + (Math.random() - .5) * H * .5 ];
+    const dir = [ aim[0] - start[0], aim[1] - start[1] ];
+    const dl = Math.hypot(dir[0], dir[1]) || 1;
+    asts.push({ el, x: start[0], y: start[1], dx: dir[0]/dl, dy: dir[1]/dl,
+      v: 3.5 + Math.random() * 3, rot: Math.random() * 360, vr: (Math.random() - .5) * 2 });
+  }
+  let alive = true;
+  (function fly(){
+    if (!alive) return;
+    const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+    for (const a of asts){
+      const d = Math.hypot(a.x - cx, a.y - cy);
+      const slow = 0.08 + Math.min(1, (d / (Math.min(cx, cy) * 0.9)) ** 2); // у центра — почти замирают
+      a.x += a.dx * a.v * slow; a.y += a.dy * a.v * slow; a.rot += a.vr;
+      if (a.x < -60 || a.x > window.innerWidth + 60 || a.y < -60 || a.y > window.innerHeight + 60){
+        a.dx = -a.dx; a.dy = -a.dy; // отражаем обратно, пусть кружат
+      }
+      a.el.style.transform = 'translate(' + a.x + 'px,' + a.y + 'px) rotate(' + a.rot + 'deg)';
+    }
+    requestAnimationFrame(fly);
+  })();
+
+  document.body.appendChild(ov);
+  document.getElementById('news-ok').onclick = () => {
+    alive = false;
+    try { localStorage.setItem('taimen-ver', APP_VERSION); } catch { /* ok */ }
+    ov.remove();
+    if (cb) cb();
+  };
+}
+
+/* PWA: офлайн-оболочка */
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+/* отладочный хук (демо/диагностика) */
+window.TAIMEN = { cam, orbs, S, spawnOrb, toggleEntity, setStatus, focusOrb, showInfo, orbIdxByEnt,
+  pickOrb, pulse: (v) => { speechEnv = v; } };
+</script>
+</body>
+</html>
