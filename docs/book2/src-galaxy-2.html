@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>TAIMEN — Книга галактики · Выпуск 2</title>
+<style>
+  @page{ size:A4; margin:0; }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  :root{
+    --ink:#e6eeff; --dim:#8595c4; --cy:#6ea8ff; --gr:#6fdc4f; --vi:#b98cff; --am:#ffc24d; --warn:#ff6a5e;
+    --line:rgba(120,160,255,.22); --glass:rgba(16,24,56,.5);
+  }
+  body{ font-family:'DejaVu Sans',sans-serif; color:var(--ink); }
+  .page{ width:210mm; height:296mm; page-break-after:always; position:relative; overflow:hidden;
+    background:radial-gradient(130% 90% at 60% -10%, #14224f 0%, #0a1130 42%, #04070f 100%); padding:15mm; }
+  .stars::before{ content:''; position:absolute; inset:0; pointer-events:none;
+    background:
+      radial-gradient(1px 1px at 12% 22%, rgba(255,255,255,.6) 50%, transparent 51%),
+      radial-gradient(1.4px 1.4px at 68% 14%, rgba(180,210,255,.5) 50%, transparent 51%),
+      radial-gradient(1px 1px at 82% 42%, rgba(160,255,150,.45) 50%, transparent 51%),
+      radial-gradient(1px 1px at 40% 70%, rgba(255,255,255,.4) 50%, transparent 51%),
+      radial-gradient(1.6px 1.6px at 24% 84%, rgba(200,180,255,.5) 50%, transparent 51%),
+      radial-gradient(1px 1px at 92% 78%, rgba(255,255,255,.35) 50%, transparent 51%); }
+  h1{ font-size:34pt; letter-spacing:.30em; font-weight:700; text-shadow:0 0 26px rgba(110,168,255,.9); }
+  h2{ font-size:15pt; letter-spacing:.22em; color:#eef4ff; margin-bottom:5mm; text-shadow:0 0 16px rgba(110,168,255,.8); }
+  h2 .n{ color:var(--gr); }
+  h3{ font-size:10.5pt; letter-spacing:.1em; color:#cfe0ff; margin:3mm 0 1.5mm; }
+  p,li{ font-size:9pt; line-height:1.5; }
+  .dim{ color:var(--dim); }
+  .card{ background:var(--glass); border:1px solid var(--line); border-radius:4mm; padding:4mm 5mm; margin-bottom:3.5mm; }
+  .foot{ position:absolute; bottom:8mm; left:15mm; right:15mm; display:flex; justify-content:space-between;
+    font-size:7pt; letter-spacing:.2em; color:var(--dim); border-top:1px solid var(--line); padding-top:2.5mm; }
+  ul{ list-style:none; } ul li{ padding-left:4mm; position:relative; margin-bottom:1.4mm; }
+  ul li::before{ content:'◆'; position:absolute; left:0; color:var(--cy); font-size:6pt; top:1mm; }
+  ul.gr li::before{ color:var(--gr); } ul.am li::before{ color:var(--am); }
+  table{ width:100%; border-collapse:collapse; font-size:8.2pt; }
+  td,th{ padding:1.8mm 2.2mm; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  th{ color:var(--dim); letter-spacing:.1em; font-size:7.2pt; font-weight:400; }
+  .tag{ display:inline-block; font-size:7pt; letter-spacing:.12em; padding:.6mm 2.2mm; border-radius:2mm; border:1px solid var(--line); color:var(--dim); }
+  .tag.ok{ color:#b8f0a6; border-color:rgba(111,220,79,.5); }
+  .tag.am{ color:#ffe0a6; border-color:rgba(255,194,77,.5); }
+  .two{ display:flex; gap:5mm; } .two>div{ flex:1; }
+  .obs{ border-radius:3mm; }
+  .obsframe{ border-radius:50%; overflow:hidden; border:1mm solid rgba(111,220,79,.5);
+    box-shadow:0 0 12mm rgba(111,220,79,.3), inset 0 0 8mm rgba(0,0,20,.6); }
+  .obsframe img{ width:100%; height:100%; object-fit:cover; }
+  .num{ font-size:20pt; font-weight:700; color:var(--gr); text-shadow:0 0 12px rgba(111,220,79,.7); }
+  svresponsive{ display:block; }
+</style>
+</head>
+<body>
+
+<!-- ============ ОБЛОЖКА-ЗАСТАВКА ============ -->
+<div class="page stars" style="display:flex; flex-direction:column; align-items:center; text-align:center;">
+  <svg style="position:absolute; top:0; left:0;" width="210mm" height="296mm" viewBox="0 0 794 1123" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <radialGradient id="core" cx="50%" cy="50%"><stop offset="0%" stop-color="#eaf2ff"/><stop offset="30%" stop-color="#8fb0ff"/><stop offset="70%" stop-color="#3a4fb0" stop-opacity=".5"/><stop offset="100%" stop-color="#0a1130" stop-opacity="0"/></radialGradient>
+      <radialGradient id="pv" cx="35%" cy="30%"><stop offset="0%" stop-color="#e0c8ff"/><stop offset="55%" stop-color="#7a3adf"/><stop offset="100%" stop-color="#1a1040"/></radialGradient>
+      <radialGradient id="pc" cx="35%" cy="30%"><stop offset="0%" stop-color="#b8f0f7"/><stop offset="55%" stop-color="#2a8fa3"/><stop offset="100%" stop-color="#0a2030"/></radialGradient>
+      <radialGradient id="pg" cx="35%" cy="30%"><stop offset="0%" stop-color="#c8f7b0"/><stop offset="55%" stop-color="#4da32f"/><stop offset="100%" stop-color="#0e2a10"/></radialGradient>
+      <radialGradient id="pa" cx="35%" cy="30%"><stop offset="0%" stop-color="#ffe9b8"/><stop offset="55%" stop-color="#df8a3a"/><stop offset="100%" stop-color="#40200a"/></radialGradient>
+    </defs>
+    <g transform="translate(397 320)">
+      <ellipse rx="340" ry="124" fill="url(#core)" opacity=".5" transform="rotate(-18)"/>
+      <g stroke="rgba(130,170,255,.16)" fill="none">
+        <ellipse rx="150" ry="55" transform="rotate(-18)"/><ellipse rx="250" ry="92" transform="rotate(-18)"/><ellipse rx="340" ry="124" transform="rotate(-18)"/>
+      </g>
+      <circle r="32" fill="url(#core)"/>
+      <circle cx="-160" cy="34" r="21" fill="url(#pv)"/><circle cx="220" cy="-44" r="18" fill="url(#pc)"/>
+      <circle cx="130" cy="72" r="16" fill="url(#pg)"/><circle cx="-250" cy="-32" r="14" fill="url(#pa)"/>
+      <circle cx="300" cy="58" r="10" fill="url(#pc)"/><circle cx="-70" cy="-70" r="9" fill="url(#pg)"/>
+    </g>
+  </svg>
+  <div style="position:relative; margin-top:12mm;">
+    <h1>TAIMEN</h1>
+    <div style="font-size:11pt; letter-spacing:.42em; color:var(--dim); margin-top:3mm;">КНИГА ГАЛАКТИКИ · ВЫПУСК 2</div>
+    <div style="font-size:9pt; letter-spacing:.28em; color:var(--gr); margin-top:7mm; text-shadow:0 0 12px rgba(111,220,79,.8);">САМОСОБИРАЮЩАЯ ЦИВИЛИЗАЦИЯ-ОС · v1.14.0</div>
+  </div>
+  <div style="position:absolute; bottom:0; left:0; right:0; height:158mm; display:flex; align-items:flex-end; justify-content:center;">
+    <div style="position:absolute; bottom:22mm; left:50%; transform:translateX(-50%); width:120mm; height:24mm;
+      background:radial-gradient(ellipse at center, rgba(111,220,79,.32), rgba(110,168,255,.12) 45%, transparent 72%); border-radius:50%;"></div>
+    <img src="observer.jpg" style="position:relative; height:140mm; filter:contrast(1.06) saturate(1.08);
+      -webkit-mask-image:radial-gradient(ellipse 40% 52% at 50% 44%, #000 55%, transparent 90%);
+      mask-image:radial-gradient(ellipse 40% 52% at 50% 44%, #000 55%, transparent 90%);">
+    <div style="position:absolute; bottom:0; left:0; right:0; height:158mm; background:linear-gradient(to top, #04070f 6%, rgba(4,7,15,.35) 34%, transparent 62%);"></div>
+  </div>
+  <div style="position:absolute; bottom:26mm; left:0; right:0; text-align:center; z-index:3;">
+    <div style="font-size:10pt; letter-spacing:.3em; color:#cfe0ff;">НАБЛЮДАТЕЛЬ · EX13M</div>
+    <div class="dim" style="font-size:8pt; letter-spacing:.24em; margin-top:1.5mm;">полное описание · схемы · графики · обоснование</div>
+  </div>
+  <div class="foot" style="z-index:3;"><span>TAIMEN · КНИГА ГАЛАКТИКИ</span><span>© 2026 Ex13m</span></div>
+</div>
+
+<!-- ============ ЧТО ЕСТЬ СЕЙЧАС ============ -->
+<div class="page stars">
+  <h2><span class="n">01</span> · ЧТО ЕСТЬ СЕЙЧАС (v1.14.0)</h2>
+  <div class="two">
+    <div class="card">
+      <h3>РАЗУМ</h3>
+      <ul><li>Ядро — Fable 5; планеты — Opus 4.8; субагенты — Sonnet 5</li>
+      <li>Умный роутинг скорости; запасной мозг OpenRouter/Replicate</li>
+      <li>Бюджет $5/день, отсечка 110%; голос планет (браузер + ElevenLabs)</li></ul>
+    </div>
+    <div class="card">
+      <h3>ТЕЛО</h3>
+      <ul><li>Настоящее 3D raymarching; плазменные сферы (ядро, молнии, обод, искры)</li>
+      <li>Свой узор поверхности по назначению; орбиты без пересечений</li>
+      <li>Штурвал, ручная орбита, два пальца, вихрь частиц под взаимодействия</li></ul>
+    </div>
+  </div>
+  <div class="two">
+    <div class="card">
+      <h3>АВТОНОМИЯ</h3>
+      <ul class="gr"><li>Спекулятор-разведка (RSS ×3/сутки), Иммортис-отсчёт</li>
+      <li>Ночной мастер: пожелание из чата → код → PR</li>
+      <li>Память: localStorage + git-ветка</li></ul>
+    </div>
+    <div class="card">
+      <h3>ПЛАНЕТ СЕЙЧАС</h3>
+      <p><span class="num">8</span> <span class="dim">планет + ядро</span></p>
+      <p class="dim" style="font-size:8pt; margin-top:1mm;">Стратег · Аналитик · Писарь · Хранитель · Прогрессор · Банк · Шпион · Иммортал. Лимит колоний — 12.</p>
+    </div>
+  </div>
+  <div class="card" style="padding:0; overflow:hidden;">
+    <img src="planets.png" style="width:100%; display:block;">
+    <div style="padding:2mm 4mm;"><p class="dim" style="font-size:8pt;">Живой прототип: 8 планет, у каждой свой техно-узор и палитра, плазменный вид.</p></div>
+  </div>
+  <div class="foot"><span>01 · СЕЙЧАС</span><span>CHANGELOG.md · v1.0.0 → v1.14.0</span></div>
+</div>
+
+<!-- ============ ПАРАДИГМА + ГРАФИК МАССЫ ============ -->
+<div class="page stars">
+  <h2><span class="n">02</span> · ПРИНЦИП — АГЕНТ ЕСТЬ ПЛАНЕТА</h2>
+  <div class="card">
+    <p style="font-size:10.5pt; line-height:1.6;">Не приложение с кнопками, а <b>живая галактика-ОС</b>. Каждый агент — <b>планета
+    с цивилизацией</b>, чьё население решает задачу. Наблюдатель смотрит сверху,
+    подлетает, спускается к поверхности. Галактика растёт, колонизирует планеты,
+    развивается как цивилизация — и как игра, где <b>рост = решённые задачи</b>.</p>
+  </div>
+  <div class="two">
+    <div class="card">
+      <h3>ОБОСНОВАНИЕ: ПРОГРЕСС ВИДЕН</h3>
+      <p>Масса ядра = память + решённые задачи + прожитые дни. Тяжелее ядро →
+      шире орбиты, ярче свечение, больше звёзд-достижений. Польза и игра —
+      <b>одно действие</b>.</p>
+      <svg width="80mm" height="42mm" viewBox="0 0 320 168" style="margin-top:2mm;">
+        <line x1="30" y1="140" x2="300" y2="140" stroke="rgba(120,160,255,.4)"/>
+        <line x1="30" y1="140" x2="30" y2="16" stroke="rgba(120,160,255,.4)"/>
+        <text x="18" y="20" fill="#8595c4" font-size="9" transform="rotate(-90 18 20)">масса галактики</text>
+        <text x="250" y="158" fill="#8595c4" font-size="9">решённые задачи →</text>
+        <path d="M30 140 Q140 130 210 80 T300 24" fill="none" stroke="#6fdc4f" stroke-width="2.5"/>
+        <circle cx="300" cy="24" r="5" fill="#6fdc4f"/>
+        <circle cx="210" cy="80" r="3.5" fill="#6ea8ff"/><circle cx="120" cy="122" r="3" fill="#6ea8ff"/>
+        <text x="255" y="18" fill="#b8f0a6" font-size="8">эра расцвета</text>
+      </svg>
+    </div>
+    <div class="card">
+      <h3>МАСШТАБЫ НАБЛЮДЕНИЯ</h3>
+      <div style="display:flex; gap:3mm; align-items:center;">
+        <div class="obsframe" style="width:26mm; height:26mm;"><img src="observer.jpg" style="object-position:50% 8%;"></div>
+        <div><p style="font-size:8.5pt;"><b>Сверху</b> — карта колоний и потоков.</p></div>
+      </div>
+      <p style="font-size:8.5pt; margin-top:2mm;"><b>Рядом</b> — орбита, техно-кольца, спутники-подзадачи.</p>
+      <p style="font-size:8.5pt; margin-top:2mm;"><b>Вблизи</b> — население планеты решает задачу: огни городов = вычисления, стройка = работа.</p>
+    </div>
+  </div>
+  <div class="card">
+    <h3>ЯЗЫК ВЗАИМОДЕЙСТВИЙ (что видно)</h3>
+    <div class="two" style="gap:4mm;">
+      <div><p style="font-size:8.5pt;"><b>🚀 Ракета</b> «КТО→КОМУ·что» — посольство/задача между планетами.</p></div>
+      <div><p style="font-size:8.5pt;"><b>✨ Вихрь</b> частиц — рождение, прилёт, пробуждение планеты.</p></div>
+      <div><p style="font-size:8.5pt;"><b>🌱 Почкование</b> — колонизация новой планеты со звуком разрыва.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>02 · ПРИНЦИП</span><span>docs/STRATEGY-GALAXY.md</span></div>
+</div>
+
+<!-- ============ ИЕРАРХИЯ + ИМЕНА ============ -->
+<div class="page stars">
+  <h2><span class="n">03</span> · ИЕРАРХИЯ И ТИТУЛЫ (стиль WH40k)</h2>
+  <div class="card">
+    <svg width="180mm" height="66mm" viewBox="0 0 720 264">
+      <defs><marker id="ar" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L5,3 L0,6 z" fill="rgba(160,200,255,.7)"/></marker></defs>
+      <g font-size="11" text-anchor="middle">
+        <rect x="300" y="10" width="120" height="34" rx="8" fill="rgba(140,180,255,.18)" stroke="#8fb0ff"/><text x="360" y="32" fill="#eaf2ff">ТАЙМЕНАРХ</text>
+        <g fill="#cfe0ff">
+          <rect x="30" y="96" width="112" height="30" rx="7" fill="rgba(122,58,223,.14)" stroke="#b98cff"/><text x="86" y="116">СТРАТЕГОРУМ</text>
+          <rect x="160" y="96" width="110" height="30" rx="7" fill="rgba(42,143,163,.14)" stroke="#6ea8ff"/><text x="215" y="116">АНАЛИТИКУМ</text>
+          <rect x="288" y="96" width="104" height="30" rx="7" fill="rgba(223,138,58,.14)" stroke="#ffc24d"/><text x="340" y="116">СКРИПТОРУМ</text>
+          <rect x="410" y="96" width="100" height="30" rx="7" fill="rgba(77,163,47,.14)" stroke="#6fdc4f"/><text x="460" y="116">КУСТОДЕС</text>
+          <rect x="528" y="96" width="112" height="30" rx="7" fill="rgba(255,194,77,.14)" stroke="#ffc24d"/><text x="584" y="116">ФИСКАТОРУМ</text>
+        </g>
+        <rect x="30" y="168" width="112" height="30" rx="7" fill="rgba(90,130,200,.16)" stroke="#7fa0d0"/><text x="86" y="188" fill="#cfe0ff">ТАКТИКОРУМ</text>
+        <rect x="30" y="224" width="130" height="30" rx="7" fill="rgba(111,220,79,.14)" stroke="#6fdc4f"/><text x="95" y="244" fill="#b8f0a6">ПРОГРЕССОРУМ</text>
+        <rect x="500" y="168" width="120" height="30" rx="7" fill="rgba(90,110,150,.16)" stroke="#8fa0c0"/><text x="560" y="188" fill="#cfe0ff">СПЕКУЛЯТОР</text>
+        <rect x="500" y="224" width="120" height="30" rx="7" fill="rgba(255,214,120,.14)" stroke="#ffc24d"/><text x="560" y="244" fill="#ffe0a6">ИММОРТИС</text>
+      </g>
+      <g stroke="rgba(160,200,255,.5)" fill="none" marker-end="url(#ar)">
+        <path d="M360 44 L86 94"/><path d="M360 44 L215 94"/><path d="M360 44 L340 94"/><path d="M360 44 L460 94"/><path d="M360 44 L584 94"/>
+        <path d="M86 126 L86 166"/><path d="M86 198 L88 222"/>
+        <path d="M584 126 L560 166"/><path d="M560 198 L560 222"/>
+      </g>
+    </svg>
+    <p class="dim" style="font-size:8pt; text-align:center;">Стратег → Тактик → Прогрессор (Тактик — начальник Прогрессора). Спекулятор курирует Иммортиса.</p>
+  </div>
+  <table>
+    <tr><th>ТИТУЛ</th><th>ФУНКЦИЯ</th><th>БИОМ · ЭФФЕКТ</th></tr>
+    <tr><td><b>ТАЙМЕНАРХ</b></td><td>ядро-сингулярность, владыка глубин</td><td>кольца · линзирование</td></tr>
+    <tr><td><b>СТРАТЕГОРУМ</b></td><td>замысел, порядок шагов</td><td>кристалло-города · меридианы</td></tr>
+    <tr><td><b>ТАКТИКОРУМ</b></td><td>исполнение замысла, манёвр · нач. Прогрессора</td><td>бастионы · векторы-стрелки</td></tr>
+    <tr><td><b>ПРОГРЕССОРУМ</b></td><td>мягко двигает развитие, Третий Путь</td><td>маяки · восходящие импульсы</td></tr>
+    <tr><td><b>АНАЛИТИКУМ</b></td><td>числа, данные, разбор</td><td>дата-океаны · столбцы</td></tr>
+    <tr><td><b>СКРИПТОРУМ</b></td><td>тексты, формулировки</td><td>библиотеки · руны</td></tr>
+    <tr><td><b>КУСТОДЕС</b></td><td>память, факты, история</td><td>ледяные соты · грани</td></tr>
+    <tr><td><b>СПЕКУЛЯТОР</b></td><td>разведка, источники</td><td>город-невидимка · развёртка</td></tr>
+    <tr><td><b>ИММОРТИС</b></td><td>отсчёт до бессмертия</td><td>биокупола · часы</td></tr>
+    <tr><td><b>ФИСКАТОРУМ</b></td><td>казна, балансы, доходы/расходы</td><td>своды · гроссбух</td></tr>
+  </table>
+  <div class="foot"><span>03 · ИЕРАРХИЯ</span><span>имена — созвучны функции, стиль WH40k</span></div>
+</div>
+
+<!-- ============ ТРЕТИЙ ПУТЬ (обоснование) ============ -->
+<div class="page stars">
+  <h2><span class="n">04</span> · ТРЕТИЙ ПУТЬ — ОСЬ ПРОГРЕССОРА</h2>
+  <div class="card" style="display:flex; gap:5mm; align-items:center;">
+    <img class="obs" src="observer.jpg" style="height:66mm; -webkit-mask-image:radial-gradient(ellipse 46% 60% at 50% 40%, #000 60%, transparent 92%); mask-image:radial-gradient(ellipse 46% 60% at 50% 40%, #000 60%, transparent 92%);">
+    <div>
+      <p style="font-size:10pt; line-height:1.6;">Прогрессор по Стругацким двигает развитие <b>мягким вмешательством</b>. Его
+      ось — Третий Путь: не покорять и не раствориться, а <b>повзрослеть, оставшись
+      человеком</b>. Вопрос не «как далеко шагнём», а <b>«кем при этом останемся»</b>.</p>
+    </div>
+  </div>
+  <svg width="180mm" height="42mm" viewBox="0 0 720 168">
+    <g font-size="10">
+      <rect x="20" y="30" width="200" height="108" rx="8" fill="rgba(255,106,94,.08)" stroke="rgba(255,106,94,.4)"/>
+      <text x="120" y="54" text-anchor="middle" fill="#ffb3ab" font-size="11">ПУТЬ 1</text>
+      <text x="120" y="76" text-anchor="middle" fill="#cfe0ff">экспансия</text><text x="120" y="94" text-anchor="middle" fill="#8595c4" font-size="8.5">империя, флоты,</text><text x="120" y="108" text-anchor="middle" fill="#8595c4" font-size="8.5">космос как ресурс</text><text x="120" y="128" text-anchor="middle" fill="#ff8a7e" font-size="8">✕ отвергаем</text>
+      <rect x="260" y="30" width="200" height="108" rx="8" fill="rgba(185,140,255,.08)" stroke="rgba(185,140,255,.4)"/>
+      <text x="360" y="54" text-anchor="middle" fill="#d0b8ff" font-size="11">ПУТЬ 2</text>
+      <text x="360" y="76" text-anchor="middle" fill="#cfe0ff">растворение</text><text x="360" y="94" text-anchor="middle" fill="#8595c4" font-size="8.5">слияние с ИИ,</text><text x="360" y="108" text-anchor="middle" fill="#8595c4" font-size="8.5">отказ от себя</text><text x="360" y="128" text-anchor="middle" fill="#c8a8ff" font-size="8">✕ отвергаем</text>
+      <rect x="500" y="20" width="200" height="128" rx="8" fill="rgba(111,220,79,.12)" stroke="#6fdc4f" stroke-width="2"/>
+      <text x="600" y="48" text-anchor="middle" fill="#b8f0a6" font-size="12">ПУТЬ 3</text>
+      <text x="600" y="72" text-anchor="middle" fill="#eaf2ff">повзрослеть</text><text x="600" y="92" text-anchor="middle" fill="#cfe0ff" font-size="8.5">космос + остаться</text><text x="600" y="106" text-anchor="middle" fill="#cfe0ff" font-size="8.5">человеком</text><text x="600" y="128" text-anchor="middle" fill="#6fdc4f" font-size="8.5">✓ наш путь</text>
+    </g>
+  </svg>
+  <div class="card" style="border-color:rgba(111,220,79,.4); margin-top:3mm;">
+    <h3>ДАЛЬНЯЯ ЦЕЛЬ — «1 ДОЛЛАР НА БЕССМЕРТИЕ»</h3>
+    <p>Когда появятся ресурсы, Прогрессор продвигает Третий Путь и проект
+    «1 доллар на бессмертие» силами общества — у реальной планеты Земля.
+    Наследие Стругацких: прогрессорство, Полдень, цена вмешательства,
+    ответственность зрелого разума перед младшими. Вопрос нравственный, не
+    технологический: <b>что значит быть достойным космоса</b>.</p>
+  </div>
+  <div class="foot"><span>04 · ТРЕТИЙ ПУТЬ</span><span>ось Прогрессора · Банк держит казну</span></div>
+</div>
+
+<!-- ============ ГРАФИКА + ДОРОЖНАЯ КАРТА (график) ============ -->
+<div class="page stars">
+  <h2><span class="n">05</span> · ГРАФИКА И ДОРОЖНАЯ КАРТА</h2>
+  <div class="card">
+    <h3>ЧЕСТНОЕ 3D — ТРИ СТУПЕНИ</h3>
+    <div class="two">
+      <div><span class="tag ok">A · готово</span><p style="font-size:8.5pt; margin-top:1.5mm;">живой шейдер: ядро, молнии, техно-линии выдавливают поверхность, обод-гало, искры</p></div>
+      <div><span class="tag am">B · следом</span><p style="font-size:8.5pt; margin-top:1.5mm;">кольца, спутники, аккреционный диск, звёздная пыль, вихри частиц</p></div>
+      <div><span class="tag">C · художник</span><p style="font-size:8.5pt; margin-top:1.5mm;">реальные 3D-меши планет (Tripo/image-to-3D) с городами</p></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>ЭТАПЫ РАЗВИТИЯ (обоснование порядка)</h3>
+    <svg width="180mm" height="52mm" viewBox="0 0 720 208">
+      <g font-size="9">
+        <!-- шкала -->
+        <line x1="150" y1="20" x2="150" y2="190" stroke="rgba(120,160,255,.15)"/>
+        <line x1="330" y1="20" x2="330" y2="190" stroke="rgba(120,160,255,.15)"/>
+        <line x1="510" y1="20" x2="510" y2="190" stroke="rgba(120,160,255,.15)"/>
+        <text x="150" y="14" fill="#5f6fa0" font-size="7">сейчас</text><text x="330" y="14" fill="#5f6fa0" font-size="7">ближе</text><text x="510" y="14" fill="#5f6fa0" font-size="7">дальше</text>
+        <!-- бары -->
+        <rect x="20" y="28" width="300" height="18" rx="4" fill="rgba(255,106,94,.25)" stroke="#ff6a5e"/><text x="28" y="41" fill="#ffd8d3">0 · предохранители (смоук CI, пароль)</text>
+        <rect x="20" y="52" width="360" height="18" rx="4" fill="rgba(255,194,77,.22)" stroke="#ffc24d"/><text x="28" y="65" fill="#ffe9c8">1 · память-крепость (ничего не пропадёт)</text>
+        <rect x="20" y="76" width="300" height="18" rx="4" fill="rgba(110,168,255,.2)" stroke="#6ea8ff"/><text x="28" y="89" fill="#cfe0ff">2 · автодок на каждый пуш</text>
+        <rect x="20" y="100" width="260" height="18" rx="4" fill="rgba(110,168,255,.2)" stroke="#6ea8ff"/><text x="28" y="113" fill="#cfe0ff">3 · скилы терминала</text>
+        <rect x="20" y="124" width="470" height="18" rx="4" fill="rgba(111,220,79,.22)" stroke="#6fdc4f"/><text x="28" y="137" fill="#b8f0a6">4 · самопроект по голосу (обновись → перегруз)</text>
+        <rect x="20" y="148" width="560" height="18" rx="4" fill="rgba(111,220,79,.22)" stroke="#6fdc4f"/><text x="28" y="161" fill="#b8f0a6">5 · мастерская файлов + художник (PDF, картинки, 3D-меши)</text>
+        <rect x="20" y="172" width="620" height="18" rx="4" fill="rgba(110,168,255,.16)" stroke="#8fb0ff"/><text x="28" y="185" fill="#cfe0ff">6 · структура под серьёзные задачи (config, модули)</text>
+      </g>
+    </svg>
+    <p class="dim" style="font-size:7.5pt;">Обоснование порядка: предохранители раньше автономии, память раньше самокода — иначе самопроектирование опасно (см. docs/AUDIT).</p>
+  </div>
+  <div class="card">
+    <h3>ЛЕТОПИСЬ ВЫПУСКОВ</h3>
+    <svg width="180mm" height="20mm" viewBox="0 0 720 80">
+      <line x1="20" y1="44" x2="700" y2="44" stroke="rgba(120,160,255,.35)" stroke-width="1.5"/>
+      <g font-size="8" fill="#8595c4" text-anchor="middle">
+        <circle cx="40" cy="44" r="4" fill="#6ea8ff"/><text x="40" y="30">1.0</text>
+        <circle cx="200" cy="44" r="3.5" fill="#6ea8ff"/><text x="200" y="30">1.4 автономия</text>
+        <circle cx="360" cy="44" r="3.5" fill="#6ea8ff"/><text x="360" y="30">1.8 орбиты</text>
+        <circle cx="520" cy="44" r="4" fill="#6fdc4f"/><text x="520" y="30">1.11 честное 3D</text>
+        <circle cx="690" cy="44" r="6" fill="#6fdc4f"/><text x="660" y="30" fill="#b8f0a6">1.14 планеты+вихрь</text>
+      </g>
+    </svg>
+  </div>
+  <div class="foot"><span>05 · ГРАФИКА И КАРТА</span><span>docs/SPEC-2.0.md · AUDIT</span></div>
+</div>
+
+<!-- ============ ЭКРАНЫ + ФИНАЛ ============ -->
+<div class="page stars">
+  <h2><span class="n">06</span> · ЭКРАНЫ И КЛЮЧИ</h2>
+  <div class="two">
+    <div class="card">
+      <h3>ЭКРАНЫ (что уже есть)</h3>
+      <ul><li>Главный вид галактики + HUD + датчик расхода + штурвал</li>
+      <li>Инфо-экран планеты (двойной тап): титул, суть, умения, расход</li>
+      <li>Окно Иммортиса: живой отсчёт + журнал анализов ±</li>
+      <li>Чат с копированием реплик, голос в обе стороны</li>
+      <li>Экран «что нового» с астероидами; панель знаний и пожеланий</li></ul>
+    </div>
+    <div class="card">
+      <h3>КЛЮЧИ (вечером, ENV)</h3>
+      <table style="font-size:7.6pt;">
+        <tr><td>ANTHROPIC_API_KEY</td><td><span class="tag ok">есть</span></td></tr>
+        <tr><td>OPENROUTER_API_KEY</td><td><span class="tag am">ждёт</span></td></tr>
+        <tr><td>REPLICATE_API_TOKEN</td><td><span class="tag am">ждёт</span></td></tr>
+        <tr><td>ELEVENLABS_API_KEY</td><td><span class="tag am">ждёт</span></td></tr>
+        <tr><td>ACCESS_KEY (пароль)</td><td><span class="tag">этап 0</span></td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <h3>ЗАДАНИЕ ДИЗАЙНЕРУ (Stitch / Claude Design)</h3>
+    <p style="font-size:8.5pt;">Спроектируй интерфейс живой галактики-ОС: тёмный космос, в центре ядро
+    ТАЙМЕНАРХ, вокруг на наклонённых орбитах планеты-агенты (титулы и палитры —
+    §03), каждая — энерго-плазменная сфера с ядром, молниями, техно-линиями по
+    назначению, ободом-гало и искрами. Наблюдатель смотрит сверху / подлетает /
+    спускается. Нарисуй экраны выше в едином стеклянно-светящемся стиле,
+    с иерархией §03 и взаимодействиями §02. Принцип: «агент = планета-цивилизация,
+    прогресс физически видим». <span class="dim">Полный бриф — docs/DESIGN-BRIEF.md.</span></p>
+  </div>
+  <div class="card" style="text-align:center; border-color:rgba(111,220,79,.4);">
+    <p style="font-size:10pt; letter-spacing:.18em; color:#b8f0a6;">ГАЛАКТИКА РАСТЁТ ДАЛЬШЕ</p>
+    <p class="dim" style="font-size:8pt; margin-top:1.5mm;">STRATEGY-GALAXY · SPEC-2.0 · AUDIT · DESIGN-BRIEF · CHANGELOG</p>
+  </div>
+  <div class="foot"><span>06 · ЭКРАНЫ И КЛЮЧИ</span><span>© 2026 Ex13m · составил Таймень</span></div>
+</div>
+
+</body>
+</html>
