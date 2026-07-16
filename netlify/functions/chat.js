@@ -364,7 +364,10 @@ exports.handler = async (event) => {
 
   // Ответ запасного мозга -> тот же формат, что и основной (с учётом бюджета).
   // Порядок: OpenRouter (бесплатно), потом Replicate (копейки).
-  const viaBackup = async () => {
+  // silentOnError: если запаска тоже не смогла — вернуть null, чтобы вызвавший
+  // показал мягкое «повтори» (когда основной мозг просто моргнул), а не пугал
+  // ошибкой OpenRouter. Без флага — отдаём ошибку запаски (когда она единственная).
+  const viaBackup = async (silentOnError) => {
     let r = null;
     try { r = await askOpenRouter(messages, system, Math.min(maxTokens, 1000)); }
     catch (e) { console.error('openrouter failure', e && e.message); r = { error: 'Запасной мозг не отозвался. Попробуй ещё раз.' }; }
@@ -375,7 +378,7 @@ exports.handler = async (event) => {
       if (r2) r = r2;
     }
     if (!r) return null;
-    if (r.error) return json(502, { error: r.error });
+    if (r.error) return silentOnError ? null : json(502, { error: r.error });
     daily.cost += r.cost || 0;
     const lim = parseFloat(process.env.DAILY_COST_LIMIT) || 5;
     return json(200, { text: r.text, usage: r.usage, model: r.model,
@@ -418,6 +421,7 @@ exports.handler = async (event) => {
     const remain = () => HARD_WALL - (Date.now() - t0);
 
     let didTools = false;
+    let retriedOverload = false;
     for (let round = 0; round <= TOOL_ROUNDS_MAX; round++) {
       if (remain() < 800) break; // нет времени на ещё вызов — отдаём, что есть
       // инструменты — только не на последнем раунде и пока хватит времени на финал
@@ -460,15 +464,22 @@ exports.handler = async (event) => {
         let detail = '';
         try { detail = ((await res.json()).error || {}).message || ''; } catch { /* ignore */ }
         console.error('anthropic error', res.status, detail);
+        // перегруз (529/500/503) часто мигает — один тихий повтор, если есть время
+        if ((res.status === 529 || res.status === 500 || res.status === 503) && !retriedOverload && remain() > 3000) {
+          retriedOverload = true;
+          round -= 1; // тот же раунд ещё раз
+          continue;
+        }
         // основной мозг недоступен (не наша ошибка запроса) — пробуем запасной
+        // тихо: если запаска тоже не смогла, покажем мягкое «повтори», не пугая
         if (res.status === 401 || res.status === 429 || res.status >= 500) {
-          const backup = await viaBackup();
+          const backup = await viaBackup(true);
           if (backup) return backup;
         }
         const friendly =
-          res.status === 429 ? 'Слишком много мыслей сразу. Попробуй через минуту.'
+          res.status === 429 ? 'Слишком много мыслей сразу — повтори через минуту.'
           : res.status === 401 ? 'Ключ не подошёл. Проверь ANTHROPIC_API_KEY.'
-          : res.status >= 500 ? 'Глубины сейчас неспокойны. Попробуй ещё раз.'
+          : res.status >= 500 ? 'Глубины на миг переполнились — повтори через пару секунд.'
           : 'Не получилось подумать. Попробуй переформулировать.';
         return json(res.status === 429 ? 429 : 502, { error: friendly });
       }

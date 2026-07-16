@@ -132,7 +132,9 @@ function ev(method, body, ip) {
   r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'x' }] }, '10.0.0.31'));
   assert.equal(r.statusCode, 200, '529 у Anthropic + запаска -> 200');
   assert.equal(JSON.parse(r.body).text, 'запас', 'текст от запаски');
-  assert.equal(calls2.length, 2, 'два вызова: Anthropic, потом OpenRouter');
+  // 529 = один тихий повтор Anthropic, затем запаска: Anthropic, Anthropic, OpenRouter
+  assert.equal(calls2.length, 3, 'повтор при 529, потом OpenRouter');
+  assert.ok(calls2[2].includes('openrouter'), 'последним — OpenRouter');
   delete process.env.OPENROUTER_API_KEY;
 
   // запасной мозг №2 (Replicate): только REPLICATE_API_TOKEN
