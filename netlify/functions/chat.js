@@ -422,13 +422,16 @@ exports.handler = async (event) => {
 
     let didTools = false;
     let retriedOverload = false;
+    let triedLighter = false; // при перегрузе тяжёлой модели один раз падаем на Sonnet
+    let forceModel = null;    // принудительная модель (деградационный путь)
     for (let round = 0; round <= TOOL_ROUNDS_MAX; round++) {
       if (remain() < 800) break; // нет времени на ещё вызов — отдаём, что есть
       // инструменты — только не на последнем раунде и пока хватит времени на финал
-      const offerTools = handsOn && round < TOOL_ROUNDS_MAX && remain() > (WRAP_RESERVE + 1500);
+      // (на деградационном Sonnet-пути инструменты не предлагаем — нужен быстрый ответ)
+      const offerTools = !forceModel && handsOn && round < TOOL_ROUNDS_MAX && remain() > (WRAP_RESERVE + 1500);
       // после «рук» финальную сборку делаем быстрым Sonnet (Fable с размышлением
       // не успеет в остаток) — чтобы приходил настоящий ответ, а не извинение
-      const roundModel = (didTools && !offerTools) ? 'claude-sonnet-5' : model;
+      const roundModel = forceModel || ((didTools && !offerTools) ? 'claude-sonnet-5' : model);
       const roundFable = roundModel === 'claude-fable-5';
       const ac = new AbortController();
       const tm = setTimeout(() => ac.abort(), Math.max(1500, remain()));
@@ -468,6 +471,15 @@ exports.handler = async (event) => {
         if ((res.status === 529 || res.status === 500 || res.status === 503) && !retriedOverload && remain() > 3000) {
           retriedOverload = true;
           round -= 1; // тот же раунд ещё раз
+          continue;
+        }
+        // перегруз тяжёлой модели: прежде чем идти на хилую бесплатную запаску,
+        // пробуем более лёгкую Sonnet 5 на том же ключе (у неё почти всегда есть
+        // ёмкость, бюджет $5/день едва тронут) — так ответ приходит без OpenRouter
+        if (res.status >= 500 && !triedLighter && roundModel !== 'claude-sonnet-5' && remain() > 2500) {
+          triedLighter = true;
+          forceModel = 'claude-sonnet-5';
+          round -= 1; // тот же раунд, но уже на Sonnet
           continue;
         }
         // основной мозг недоступен (не наша ошибка запроса) — пробуем запасной
