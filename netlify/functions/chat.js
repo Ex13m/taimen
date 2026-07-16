@@ -402,8 +402,15 @@ exports.handler = async (event) => {
 
   try {
     const isFable = model === 'claude-fable-5';
-    // руки даём только главному разуму (не свите): body.tools !== false
-    const handsOn = body.tools !== false && !body.entity;
+    // «Руки» (сеть/совет планет) — только главному разуму (не свите) и только
+    // когда вопрос их РЕАЛЬНО требует. Иначе на каждый простой вопрос шли бы
+    // лишние раунды инструментов = задержка. Признак нужды в руках: длинный
+    // вопрос ИЛИ явные слова про поиск/актуальность/ссылку.
+    const HANDS_HINT = /(найд|погугл|посмотр|проверь|узна|спрос|сколько\s|курс\b|погод|новост|https?:|www\.|сегодня|сейчас|актуальн|котиров|цена|стоит|который час|время в|расписан|прогноз)/i;
+    const lastU = [...messages].reverse().find((m) => m.role === 'user');
+    const lastText = lastU ? (typeof lastU.content === 'string' ? lastU.content : JSON.stringify(lastU.content || '')) : '';
+    const needsHands = lastText.length > 140 || HANDS_HINT.test(lastText);
+    const handsOn = body.tools !== false && !body.entity && needsHands;
     const addCost = (m, u) => {
       const p = PRICES[m] || [5, 25];
       daily.cost += (((u.input_tokens || u.in || 0) * p[0]) + ((u.output_tokens || u.out || 0) * p[1])) / 1e6;
@@ -422,8 +429,11 @@ exports.handler = async (event) => {
 
     let didTools = false;
     let retriedOverload = false;
-    let triedLighter = false; // при перегрузе тяжёлой модели один раз падаем на Sonnet
-    let forceModel = null;    // принудительная модель (деградационный путь)
+    // лестница деградации при перегрузе (529/5xx): сперва Opus 4.8, затем Sonnet 5
+    // (оба на том же ключе, бюджет $5/день едва тронут), и лишь потом — бесплатная запаска
+    const DEGRADE = ['claude-opus-4-8', 'claude-sonnet-5'].filter((m) => m !== model);
+    let degradeIdx = -1;   // -1 = ещё не деградировали
+    let forceModel = null; // принудительная модель (деградационный путь)
     for (let round = 0; round <= TOOL_ROUNDS_MAX; round++) {
       if (remain() < 800) break; // нет времени на ещё вызов — отдаём, что есть
       // инструменты — только не на последнем раунде и пока хватит времени на финал
@@ -473,13 +483,12 @@ exports.handler = async (event) => {
           round -= 1; // тот же раунд ещё раз
           continue;
         }
-        // перегруз тяжёлой модели: прежде чем идти на хилую бесплатную запаску,
-        // пробуем более лёгкую Sonnet 5 на том же ключе (у неё почти всегда есть
-        // ёмкость, бюджет $5/день едва тронут) — так ответ приходит без OpenRouter
-        if (res.status >= 500 && !triedLighter && roundModel !== 'claude-sonnet-5' && remain() > 2500) {
-          triedLighter = true;
-          forceModel = 'claude-sonnet-5';
-          round -= 1; // тот же раунд, но уже на Sonnet
+        // перегруз: прежде чем идти на хилую бесплатную запаску, спускаемся по
+        // лестнице Anthropic — Opus 4.8, затем Sonnet 5 (тот же ключ, есть ёмкость)
+        if (res.status >= 500 && degradeIdx < DEGRADE.length - 1 && remain() > 2500) {
+          degradeIdx += 1;
+          forceModel = DEGRADE[degradeIdx];
+          round -= 1; // тот же раунд, но на следующей модели лестницы
           continue;
         }
         // основной мозг недоступен (не наша ошибка запроса) — пробуем запасной

@@ -132,11 +132,11 @@ function ev(method, body, ip) {
   r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'x' }] }, '10.0.0.31'));
   assert.equal(r.statusCode, 200, '529 у Anthropic + запаска -> 200');
   assert.equal(JSON.parse(r.body).text, 'запас', 'текст от запаски');
-  // 529 = тихий повтор той же модели, затем ступень на Sonnet 5 (тот же ключ),
-  // и лишь потом бесплатная запаска: Anthropic, Anthropic, Anthropic(Sonnet), OpenRouter
-  assert.equal(calls2.length, 4, 'повтор + ступень Sonnet при 529, потом OpenRouter');
-  assert.ok(calls2[0].includes('anthropic') && calls2[2].includes('anthropic'), 'три попытки Anthropic (включая Sonnet)');
-  assert.ok(calls2[3].includes('openrouter'), 'последним — OpenRouter');
+  // 529 = тихий повтор той же модели, затем лестница Opus 4.8 → Sonnet 5 (тот же
+  // ключ), и лишь потом бесплатная запаска: 4 попытки Anthropic, затем OpenRouter
+  assert.equal(calls2.length, 5, 'повтор + Opus + Sonnet при 529, потом OpenRouter');
+  assert.ok(calls2.slice(0, 4).every((u) => u.includes('anthropic')), 'четыре попытки Anthropic (Fable, Fable, Opus, Sonnet)');
+  assert.ok(calls2[4].includes('openrouter'), 'последним — OpenRouter');
   delete process.env.OPENROUTER_API_KEY;
 
   // запасной мозг №2 (Replicate): только REPLICATE_API_TOKEN
@@ -182,7 +182,8 @@ function ev(method, body, ip) {
       content: [{ type: 'text', text: 'Совет собран: Стратегорум дал три шага. [[mood:focus]]' }],
       usage: { input_tokens: 20, output_tokens: 15 } }) };
   };
-  r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'сложная задача' }] }, '10.0.0.40'));
+  // сообщение с явной нуждой в руках ("спроси…") — руки предлагаются
+  r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'спроси у планет: дай план' }] }, '10.0.0.40'));
   assert.equal(r.statusCode, 200, 'tool loop -> 200');
   const tl = JSON.parse(r.body);
   assert.ok(tl.text.includes('Совет собран'), 'финальный текст после инструментов');
@@ -190,10 +191,29 @@ function ev(method, body, ip) {
   assert.equal(tl.trace[0].tool, 'ask_planet', 'след ask_planet');
   assert.equal(tl.trace[0].id, 'strateg', 'кому летало посольство');
   assert.ok(tl.usage.out >= 25, 'usage суммируется по ходам');
-  // свите руки не даются
-  const seqBefore = seq.length;
-  r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'x' }], entity: 'strateg', model: 'claude-opus-4-8' }, '10.0.0.41'));
-  assert.equal(seq[seqBefore].tools, false, 'у свиты нет tools');
+
+  // простой короткий вопрос — руки НЕ предлагаются: один быстрый вызов без раундов
+  const seqS = [];
+  global.fetch = async (url, opts) => {
+    const b = JSON.parse(opts.body);
+    seqS.push({ tools: !!b.tools });
+    return { ok: true, status: 200, json: async () => ({ model: 'claude-fable-5', stop_reason: 'end_turn',
+      content: [{ type: 'text', text: 'Привет.' }], usage: { input_tokens: 3, output_tokens: 2 } }) };
+  };
+  r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'привет, как ты?' }] }, '10.0.0.42'));
+  assert.equal(r.statusCode, 200, 'простой вопрос -> 200');
+  assert.equal(seqS.length, 1, 'простой вопрос — один вызов, без раундов инструментов');
+  assert.equal(seqS[0].tools, false, 'простому вопросу руки не предлагаются');
+  // свите руки не даются (даже с триггер-словом «спроси»)
+  const seqE = [];
+  global.fetch = async (url, opts) => {
+    const b = JSON.parse(opts.body);
+    seqE.push({ tools: !!b.tools });
+    return { ok: true, status: 200, json: async () => ({ model: 'claude-opus-4-8', stop_reason: 'end_turn',
+      content: [{ type: 'text', text: 'ок' }], usage: { input_tokens: 3, output_tokens: 2 } }) };
+  };
+  r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'спроси и найди' }], entity: 'strateg', model: 'claude-opus-4-8' }, '10.0.0.41'));
+  assert.equal(seqE[0].tools, false, 'у свиты нет tools');
   delete process.env.ANTHROPIC_API_KEY;
 
   // tts: GET -> 405; POST без ключа -> 501 (браузерный голос); с ключом -> audio base64
