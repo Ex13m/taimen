@@ -328,7 +328,7 @@
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · щипок — ближе · тап по шару — слово ему · долгий тап — его орбита в руках</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.20.6 · © 2026 Ex13m</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.21.0 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -383,11 +383,11 @@
    ========================================================= */
 
 const MAXO = 12;
-const APP_VERSION = '1.20.6';
+const APP_VERSION = '1.21.0';
 const WHATS_NEW = [
-  'псевдо-вызовы («_call: …») исчезли: знание о руках теперь выдаётся мозгу только вместе с настоящими инструментами — обещать и не дать больше невозможно',
-  'зов планеты по титулу («зов к Иммортису», «спроси Скрипторум») надёжно включает руки — детектор выучил все титулы и слова зова',
-  '«задумался слишком глубоко» после совета добит: посольствам — бюджет с резервом на финал, при обрыве приходят настоящие доклады планет',
+  'у планет теперь живое туманное ядро: внутри клубятся объёмные слои света и тумана, планета «дышит» — медленная пульсация яркости, у каждой своя фаза',
+  'мягче свечение и блики (без резкого стекла), еле заметная космическая пыль дрейфует в кадре',
+  'авто-качество: если устройству тяжело, разрешение рендера плавно снижается — держим 60 кадров',
 ];
 
 /* ---------- Шейдеры ---------- */
@@ -423,6 +423,14 @@ float noise3(vec3 p){
     mix(mix(hash1(n+113.0), hash1(n+114.0), u.x), mix(hash1(n+170.0), hash1(n+171.0), u.x), u.y), u.z);
 }
 float fbm3(vec3 p){ return noise3(p)*0.65 + noise3(p*2.13+31.0)*0.35; }
+/* объёмный туман ядра: FBM с domain warping — поле само себя закручивает,
+   слои клубятся плавно, без «кипения» (тз: живое туманное ядро) */
+float fogd(vec3 p, float seed, float sp){
+  vec3 w = vec3(fbm3(p*1.5 + seed        + u_time*0.10*sp),
+                fbm3(p*1.5 + seed*1.9 + 11.0 - u_time*0.08*sp),
+                fbm3(p*1.5 + seed*0.7 + 23.0 + u_time*0.06*sp));
+  return fbm3(p*2.2 + (w - 0.5)*1.9 + seed);
+}
 
 float smin(float a, float b, float k){
   float h = clamp(0.5 + 0.5*(b-a)/k, 0.0, 1.0);
@@ -585,8 +593,32 @@ void main(){
 
     float bright = 0.30 + st.w*0.65;
     float face = max(dot(dir, -rd), 0.0);        // 1 в центре диска, 0 у края
+
+    /* ЖИВОЕ ТУМАННОЕ ЯДРО: объёмный проход внутри сферы (6 слоёв тумана,
+       domain warping, плотнее к центру, тёплый свет в глубине). Дыхание —
+       медленная пульсация яркости, своя фаза у каждой планеты (seed). */
+    float breath = 0.82 + 0.18*sin(t*(0.35 + st.z*0.45) + ms.y*7.0);
+    vec3 pc = p - pr.xyz;
+    float bq = dot(pc, rd);
+    float disc2 = bq*bq - (dot(pc,pc) - pr.w*pr.w);
+    float chord = (disc2 > 0.0) ? (-bq + sqrt(disc2)) : pr.w;   // путь до выхода из сферы
+    vec3 fog = vec3(0.0); float trans = 1.0;
+    for (int fi = 0; fi < 6; fi++){
+      float ft = chord * (float(fi) + 0.5) / 6.0;
+      vec3 fp = (pc + rd*ft) / pr.w;                 // позиция внутри, -1..1
+      float rr = length(fp);
+      float den = fogd(fp*(1.7 + st.y*5.0), ms.y, 0.5 + st.x);
+      den *= smoothstep(1.05, 0.25, rr);             // плотнее к ядру
+      den = pow(clamp(den, 0.0, 1.0), 1.6) * (0.55 + st.z*0.9);
+      vec3 fcol = mix(colB*1.35, colA, clamp(rr*1.2, 0.0, 1.0))
+                + vec3(1.0, 0.95, 0.85) * smoothstep(0.55, 0.0, rr) * 0.8;
+      fog += fcol * den * trans * 0.62;
+      trans *= 1.0 - den*0.45;
+    }
+    fog *= breath;
+
     /* горячее ядро-плазма: яркий светящийся центр, как в энерго-сферах */
-    float core = pow(face, 3.5) * (0.6 + st.z*1.6 + st.w*0.8);
+    float core = pow(face, 3.5) * (0.6 + st.z*1.6 + st.w*0.8) * breath;
     vec3 coreCol = mix(vec3(1.0,0.96,0.9), colB + 0.3, 0.5);
     /* электрические молнии-филаменты от ядра к краю */
     float bolt = pow(veins, 1.6) * (1.3 + st.x*0.6);
@@ -598,15 +630,17 @@ void main(){
     /* искры на поверхности */
     float spark = smoothstep(0.86, 1.0, hash2(floor(sp*60.0))) * (0.5+0.5*sin(t*3.0+f1*20.0));
 
-    c = col * (fres*2.2 + diff*0.22 + fil*1.05 + wave*1.1 + 0.10) * bright
-      + coreCol * core                                        /* горячее ядро */
-      + (col*0.4 + vec3(0.7,0.85,1.0)*0.8) * bolt             /* молнии-филаменты */
-      + (col*0.5 + vec3(0.55,0.75,1.0)*0.6) * techno * (1.1 + st.w*1.4) /* линии на гребнях */
-      + atmoCol * atmo * (0.7 + st.w*0.9)                     /* обод-гало */
-      + col * pow(fres, 3.0) * 2.4                            /* яркий плазменный обод */
-      + vec3(1.0) * gloss * 0.9                               /* глянцевый блик */
-      + vec3(0.9,0.95,1.0) * spark * (0.6 + st.w)             /* искры */
-      + vec3(0.9, 0.95, 1.0) * spec * 0.5 * bright;
+    /* оболочка полупрозрачнее прежнего — сквозь неё дышит туман ядра */
+    c = col * (fres*2.0 + diff*0.20 + fil*0.75 + wave*0.85 + 0.08) * bright
+      + fog * (0.95 + st.w*0.6)                               /* живой туман ядра */
+      + coreCol * core * 0.8                                  /* горячее ядро */
+      + (col*0.4 + vec3(0.7,0.85,1.0)*0.8) * bolt * 0.8       /* молнии-филаменты */
+      + (col*0.5 + vec3(0.55,0.75,1.0)*0.6) * techno * (0.9 + st.w*1.2) /* линии на гребнях */
+      + atmoCol * atmo * (0.7 + st.w*0.9) * (0.9 + 0.1*breath)/* обод-гало дышит */
+      + col * pow(fres, 3.0) * 2.2                            /* плазменный обод */
+      + vec3(1.0) * gloss * 0.35                              /* мягкий блик (без резкости) */
+      + vec3(0.9,0.95,1.0) * spark * (0.5 + st.w*0.8)         /* искры */
+      + vec3(0.9, 0.95, 1.0) * spec * 0.25 * bright;
 
     /* кельтский сигил проступает шумом */
     if (ms.w > 0.01){
@@ -623,6 +657,16 @@ void main(){
     c += glow*0.55;
     /* дымка расстояния */
     c = mix(c, bgSky(rd), clamp(tt*0.012, 0.0, 0.4));
+  }
+
+  /* еле заметные частицы-пыль: медленно дрейфуют, мерцают (тз: снаружи) */
+  vec2 duv = ndc*3.0 + vec2(u_time*0.010, -u_time*0.013);
+  vec2 dcell = floor(duv*40.0);
+  float dh = hash2(dcell);
+  if (dh > 0.993){
+    vec2 df = fract(duv*40.0) - 0.5;
+    c += vec3(0.6, 0.75, 1.0) * exp(-dot(df,df)*40.0) * 0.06
+       * (0.4 + 0.6*sin(u_time*1.7 + dh*60.0));
   }
 
   c = 1.0 - exp(-c*1.7);              /* тонмап */
@@ -1447,9 +1491,22 @@ function tickOrbs(t){
 /* upload + draw */
 const fPosRad = new Float32Array(MAXO*4), fStyle = new Float32Array(MAXO*4),
       fMisc = new Float32Array(MAXO*4), fColA = new Float32Array(MAXO*3), fColB = new Float32Array(MAXO*3);
+/* авто-качество: если кадр стабильно тяжелее ~22мс — снижаем разрешение
+   рендера (до 0.6×), если легче ~14мс — возвращаем. Держим 60 FPS на слабых. */
+let qScale = 1, qEma = 16, qLastT = 0;
+function tuneQuality(t){
+  if (qLastT){
+    const dt = Math.min((t - qLastT)*1000, 100);
+    qEma = qEma*0.95 + dt*0.05;
+    if (qEma > 22 && qScale > 0.6){ qScale = Math.max(0.6, qScale - 0.05); qEma = 16; }
+    else if (qEma < 14 && qScale < 1){ qScale = Math.min(1, qScale + 0.02); }
+  }
+  qLastT = t;
+}
 function draw(t){
   if (!scene) return;
-  const RES = window.innerWidth < 700 ? 0.55 : 0.72;
+  tuneQuality(t);
+  const RES = (window.innerWidth < 700 ? 0.55 : 0.72) * qScale;
   const dpr = Math.min(window.devicePixelRatio || 1, 1.6);
   const w = Math.round(canvas.clientWidth * dpr * RES), h = Math.round(canvas.clientHeight * dpr * RES);
   if (canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h); }
