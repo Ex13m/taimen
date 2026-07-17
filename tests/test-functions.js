@@ -204,6 +204,29 @@ function ev(method, body, ip) {
   assert.equal(r.statusCode, 200, 'простой вопрос -> 200');
   assert.equal(seqS.length, 1, 'простой вопрос — один вызов, без раундов инструментов');
   assert.equal(seqS[0].tools, false, 'простому вопросу руки не предлагаются');
+  // фраза без слов «найди/новости», но с ТИТУЛОМ планеты («зов к Иммортису») —
+  // руки обязаны включиться, и вместе с ними блок РУКИ в сознании
+  const seqH = [];
+  global.fetch = async (url, opts) => {
+    const b = JSON.parse(opts.body);
+    seqH.push({ tools: !!b.tools, sys: b.system || '' });
+    return { ok: true, status: 200, json: async () => ({ model: 'claude-fable-5', stop_reason: 'end_turn',
+      content: [{ type: 'text', text: 'Зов отправлен.' }], usage: { input_tokens: 3, output_tokens: 2 } }) };
+  };
+  r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'отправь зов к Иммортису, пусть сведёт счёт' }], system: 'ты рыба' }, '10.0.0.43'));
+  assert.equal(seqH[0].tools, true, 'титул планеты в вопросе -> руки включены');
+  assert.ok(seqH[0].sys.includes('РУКИ'), 'блок РУКИ подключён вместе с инструментами');
+  assert.ok(seqH[0].sys.indexOf('ты рыба') === 0, 'блок РУКИ добавлен К системному промпту, не вместо');
+  // а простому вопросу блок РУКИ в сознание не попадает (иначе псевдо-вызовы текстом)
+  const seqS2 = [];
+  global.fetch = async (url, opts) => {
+    const b = JSON.parse(opts.body);
+    seqS2.push({ sys: b.system || '' });
+    return { ok: true, status: 200, json: async () => ({ model: 'claude-fable-5', stop_reason: 'end_turn',
+      content: [{ type: 'text', text: 'Привет.' }], usage: { input_tokens: 3, output_tokens: 2 } }) };
+  };
+  r = await chat.handler(ev('POST', { messages: [{ role: 'user', content: 'привет, дружище!' }], system: 'ты рыба' }, '10.0.0.44'));
+  assert.ok(!seqS2[0].sys.includes('РУКИ'), 'без инструментов блок РУКИ не обещается');
   // свите руки не даются (даже с триггер-словом «спроси»)
   const seqE = [];
   global.fetch = async (url, opts) => {
