@@ -325,7 +325,7 @@
   <div class="sub"><span id="status-dot"></span><span id="status">дремлет</span><span id="moodword"></span></div>
   <div id="active-entity"></div>
   <div id="camhint">тяни — облёт · щипок — ближе · тап по шару — слово ему · долгий тап — его орбита в руках</div>
-  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.20.2 · © 2026 Ex13m</div>
+  <div style="font-size:9px;margin-top:3px;color:var(--dim);opacity:.55">v1.20.3 · © 2026 Ex13m</div>
 </div>
 
 <div id="memchip" class="glass" title="память Тайменя">🜁 память: <b id="memmode">локальная</b> · <b id="memcount">0</b></div>
@@ -380,11 +380,11 @@
    ========================================================= */
 
 const MAXO = 12;
-const APP_VERSION = '1.20.2';
+const APP_VERSION = '1.20.3';
 const WHATS_NEW = [
-  'простые вопросы отвечаются быстрее: «руки» (сеть/совет планет) включаются только когда вопрос их вправду требует (найди, курс, ссылка, «сколько сейчас»…) — иначе один быстрый ответ без лишних раундов',
-  'надёжная лестница мозга при перегрузе: Fable 5 → Opus 4.8 → Sonnet 5 (все на твоём ключе) → и только потом бесплатная запаска. «Все бесплатные модели заняты» теперь почти исключено',
-  'ночной мастер с независимой проверкой (строитель ≠ проверяющий, паттерн QuantumByte)',
+  'живой поток ответа: на простые вопросы Таймень печатает по мере мысли — текст появляется сразу, не ждёшь всю реплику. Если поток недоступен — тихо как раньше, без сбоев',
+  'простые вопросы быстрее: «руки» (сеть/совет планет) — только когда вопрос их вправду требует; иначе один быстрый ответ',
+  'лестница мозга при перегрузе: Fable 5 → Opus 4.8 → Sonnet 5 → и лишь потом бесплатная запаска',
 ];
 
 /* ---------- Шейдеры ---------- */
@@ -798,29 +798,42 @@ function say(role, text, cls){
     who.textContent = role === 'ent' && S.activeEntity ? ENTITIES[S.activeEntity].name : 'TAIMEN';
     div.appendChild(who);
   }
-  div.appendChild(document.createTextNode(text));
+  const txtNode = document.createTextNode(text);
+  div.appendChild(txtNode);
+  div._txt = txtNode; div._text = text; // для живого обновления (стрим) и копирования
   // ⧉ копировать: передать реплику другому агенту / в другое окно одним тапом
   const cp = document.createElement('span');
   cp.className = 'copy'; cp.textContent = '⧉'; cp.title = 'копировать';
   cp.onclick = (e) => {
     e.stopPropagation();
+    const cur = div._text; // берём актуальный текст (мог дорасти в стриме)
     const done = () => { cp.textContent = '✓'; setTimeout(() => { cp.textContent = '⧉'; }, 1100); };
     const fallback = () => {
       try {
         const ta = document.createElement('textarea');
-        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        ta.value = cur; ta.style.position = 'fixed'; ta.style.opacity = '0';
         document.body.appendChild(ta); ta.select();
         document.execCommand('copy'); ta.remove(); done();
       } catch { /* ок, хотя бы выделяемо */ }
     };
     if (navigator.clipboard && navigator.clipboard.writeText)
-      navigator.clipboard.writeText(text).then(done, fallback);
+      navigator.clipboard.writeText(cur).then(done, fallback);
     else fallback();
   };
   div.appendChild(cp);
   logEl.appendChild(div);
   logEl.scrollTop = logEl.scrollHeight;
   while (logEl.children.length > 60) logEl.removeChild(logEl.firstChild);
+  return div;
+}
+// живой пузырь для стрима: возвращает функцию дописывания текста
+function sayStream(role, cls){
+  const div = say(role, '', cls);
+  return (full) => { div._txt.nodeValue = full; div._text = full; logEl.scrollTop = logEl.scrollHeight; };
+}
+// в стриме прячем уже закрытые теги [[..]] и незакрытый «хвост», чтобы не мигали
+function stripLiveTags(s){
+  return s.replace(/\[\[[^\]]*\]\]/g, '').replace(/\[\[[^\]]*$/, '').trim();
 }
 // журнал вселенной: краткие действия агентов, новые сверху, старые тускнеют
 let alTimer = null;
@@ -1864,9 +1877,51 @@ function pickMainModel(messages){
   return deep ? 'claude-fable-5' : 'claude-sonnet-5';
 }
 async function callBrain(messages, opts){
+  opts = opts || {};
   // иерархия разума: Таймень — Fable 5/Sonnet 5 по глубине, свита — Opus 4.8, суб-задачи — Sonnet 5
-  const model = (opts && opts.model) ||
+  const model = opts.model ||
     (S.activeEntity ? (ENTITIES[S.activeEntity].model || 'claude-opus-4-8') : pickMainModel(messages));
+  // ── СТРИМ: только главному разуму и только если позвали с onDelta ──
+  // текст появляется по мере генерации; при любой осечке молча уходим на буфер
+  if (opts.onDelta && !S.activeEntity && !opts.entity){
+    try {
+      const sr = await fetch('/api/chat-stream', {
+        method: 'POST', headers: apiHeaders(),
+        body: JSON.stringify({
+          messages, system: opts.system || buildSystem(), model,
+          max_tokens: opts.max_tokens || (model === 'claude-fable-5' ? 1600 : 700),
+        }),
+      });
+      const ct = sr.headers.get('content-type') || '';
+      if (sr.ok && ct.includes('text/event-stream') && sr.body){
+        const reader = sr.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '', raw = '', meta = null;
+        for (;;){
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let nl;
+          while ((nl = buf.indexOf('\n\n')) >= 0){
+            const block = buf.slice(0, nl); buf = buf.slice(nl + 2);
+            const dl = block.split('\n').find(l => l.startsWith('data:'));
+            if (!dl) continue;
+            let o; try { o = JSON.parse(dl.slice(5).trim()); } catch { continue; }
+            if (typeof o.delta === 'string'){ raw += o.delta; opts.onDelta(raw); }
+            else if (o.done) meta = o;
+            else if (o.error) throw new Error(o.error);
+          }
+        }
+        if (meta){
+          addUsage(meta.model || model, meta.usage, 'taimen');
+          if (meta.budget){ S.serverBudget = meta.budget; updateGauge(); }
+        }
+        if (raw.trim()) return raw;
+        // пусто (стрим не дал текста) — падаем на буфер ниже
+      }
+      // не event-stream (buffered:true / не поддержано) — на обычный путь
+    } catch { /* стрим не удался — тихо на буфер */ }
+  }
   const res = await fetch('/api/chat', {
     method: 'POST', headers: apiHeaders(),
     body: JSON.stringify({
@@ -1971,11 +2026,18 @@ async function sendMessage(text){
   S.userTurns++;
   setStatus('thinking');
   try {
-    const reply = await callBrain(S.history.slice(-16));
+    let live = null; // живой пузырь для стрима (создаём на первом кусочке)
+    const reply = await callBrain(S.history.slice(-16), {
+      onDelta: (full) => {
+        if (!live){ live = sayStream(S.activeEntity ? 'ent' : 'taimen', 'taimen'); if (S.state === 'thinking') setStatus('idle'); }
+        live(stripLiveTags(full));
+      },
+    });
     const p = parseTags(reply);
     if (p.mood) S.mood = MOODS[p.mood];
     S.history.push({ role: 'assistant', content: reply });
-    say(S.activeEntity ? 'ent' : 'taimen', p.text, 'taimen');
+    if (live) live(p.text); // финальный чистый текст (без тегов)
+    else say(S.activeEntity ? 'ent' : 'taimen', p.text, 'taimen');
     const st = S.orbStats[S.activeEntity || 'taimen'];
     if (st){ st.last = p.text.slice(0, 160); st.ts = Date.now(); }
     // самосохранение: Таймень сам решил, что это стоит помнить

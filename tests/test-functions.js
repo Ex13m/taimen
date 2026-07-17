@@ -264,6 +264,46 @@ function ev(method, body, ip) {
   ['fda.gov', 'fcc.gov', 'google.com', '1.1.1.1', 'openrouter.ai', 'api.anthropic.com']
     .forEach((h) => assert.equal(bh(h), false, 'не должен блокироваться: ' + h));
 
+  // ── потоковый мозг chat-stream.mjs (стриминг простых вопросов) ──
+  const streamFn = (await import(__dirname + '/../netlify/functions/chat-stream.mjs')).default;
+  const sreq = (method, bodyObj, ip) => new Request('http://x/api/chat-stream', {
+    method,
+    body: bodyObj == null ? undefined : JSON.stringify(bodyObj),
+    headers: { 'content-type': 'application/json', 'x-nf-client-connection-ip': ip || '9.9.9.1' },
+  });
+  process.env.ANTHROPIC_API_KEY = 'sk-test';
+  // GET -> 405
+  let sr = await streamFn(sreq('GET', null, '9.9.9.2'));
+  assert.equal(sr.status, 405, 'stream GET -> 405');
+  // свите не стримим -> buffered
+  sr = await streamFn(sreq('POST', { messages: [{ role: 'user', content: 'привет' }], entity: 'strateg' }, '9.9.9.3'));
+  assert.deepEqual(await sr.json(), { buffered: true }, 'свита -> buffered');
+  // вопрос с нуждой в руках -> buffered
+  sr = await streamFn(sreq('POST', { messages: [{ role: 'user', content: 'найди курс валют' }] }, '9.9.9.4'));
+  assert.deepEqual(await sr.json(), { buffered: true }, 'руки нужны -> buffered');
+  // простой вопрос -> настоящий поток из дельт + финальное done
+  const sse = [
+    'event: message_start\ndata: {"type":"message_start","message":{"model":"claude-fable-5","usage":{"input_tokens":5}}}\n\n',
+    'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Привет"}}\n\n',
+    'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":", хозяин"}}\n\n',
+    'data: {"type":"message_delta","usage":{"output_tokens":4}}\n\n',
+    'data: [DONE]\n\n',
+  ];
+  global.fetch = async () => ({ ok: true, body: new ReadableStream({
+    start(c){ const e = new TextEncoder(); sse.forEach(s => c.enqueue(e.encode(s))); c.close(); } }) });
+  sr = await streamFn(sreq('POST', { messages: [{ role: 'user', content: 'как ты?' }] }, '9.9.9.5'));
+  assert.ok((sr.headers.get('content-type') || '').includes('text/event-stream'), 'простой вопрос -> event-stream');
+  let acc = '';
+  const rd = sr.body.getReader(); const dc = new TextDecoder();
+  for (;;){ const { done, value } = await rd.read(); if (done) break; acc += dc.decode(value, { stream: true }); }
+  let text = '', sawDone = false;
+  acc.split('\n\n').forEach(b => { const d = b.split('\n').find(l => l.startsWith('data:')); if (!d) return;
+    let o; try { o = JSON.parse(d.slice(5).trim()); } catch { return; }
+    if (o.delta) text += o.delta; if (o.done) sawDone = true; });
+  assert.equal(text, 'Привет, хозяин', 'поток собрал текст из дельт');
+  assert.ok(sawDone, 'в конце — кадр done с метаданными');
+  delete process.env.ANTHROPIC_API_KEY;
+
   global.fetch = realFetch;
   console.log('ВСЕ ТЕСТЫ ПРОШЛИ ✓');
 })().catch((e) => { console.error('ТЕСТ УПАЛ:', e.message); process.exit(1); });
