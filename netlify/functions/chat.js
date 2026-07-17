@@ -429,6 +429,10 @@ exports.handler = async (event) => {
 
     let didTools = false;
     let retriedOverload = false;
+    // собранное руками: если финальная сборка не успеет по времени — отдадим
+    // хозяину настоящие ответы планет/сети, а не заглушку «задумался глубоко»
+    const toolNotes = [];
+    const notesText = () => toolNotes.map((n) => n.who + ': ' + n.out).join('\n\n').slice(0, 3000);
     // лестница деградации при перегрузе (529/5xx): сперва Opus 4.8, затем Sonnet 5
     // (оба на том же ключе, бюджет $5/день едва тронут), и лишь потом — бесплатная запаска
     const DEGRADE = ['claude-opus-4-8', 'claude-sonnet-5'].filter((m) => m !== model);
@@ -443,6 +447,8 @@ exports.handler = async (event) => {
       // не успеет в остаток) — чтобы приходил настоящий ответ, а не извинение
       const roundModel = forceModel || ((didTools && !offerTools) ? 'claude-sonnet-5' : model);
       const roundFable = roundModel === 'claude-fable-5';
+      // финальная сборка после рук — короткая: должна успеть в остаток времени
+      const roundMax = (didTools && !offerTools) ? Math.min(maxTokens, 500) : maxTokens;
       const ac = new AbortController();
       const tm = setTimeout(() => ac.abort(), Math.max(1500, remain()));
       let res;
@@ -458,7 +464,7 @@ exports.handler = async (event) => {
             ...(roundFable ? { 'anthropic-beta': 'server-side-fallback-2026-06-01' } : {}),
           },
           body: JSON.stringify({
-            model: roundModel, max_tokens: maxTokens, system, messages: convo,
+            model: roundModel, max_tokens: roundMax, system, messages: convo,
             ...(offerTools ? { tools: TOOLS } : {}),
             ...(roundFable ? { fallbacks: [{ model: FABLE_FALLBACK }] } : {}),
           }),
@@ -467,6 +473,10 @@ exports.handler = async (event) => {
         clearTimeout(tm);
         console.error('anthropic call aborted/failed', e && e.name);
         if (data) break; // уже был ответ раньше — отдадим его
+        // руки успели собрать ответы — отдаём их как есть, это ценнее заглушки
+        if (toolNotes.length) {
+          return json(200, { text: 'Совет собрал, своими словами свести не успел — вот доклады напрямую:\n\n' + notesText(), usage, model, budget: { spent: Math.round(daily.cost * 100) / 100, limit: parseFloat(process.env.DAILY_COST_LIMIT) || 5 }, trace });
+        }
         const backup = await viaBackup();
         if (backup) return backup;
         return json(200, { text: 'Задумался слишком глубоко — задай короче или по частям.', usage, model, budget: { spent: Math.round(daily.cost * 100) / 100, limit: parseFloat(process.env.DAILY_COST_LIMIT) || 5 }, trace });
@@ -518,15 +528,22 @@ exports.handler = async (event) => {
 
       // исполняем инструменты ПАРАЛЛЕЛЬНО (не более 3), возвращаем результаты
       convo.push({ role: 'assistant', content: data.content });
+      // инструментам нельзя съедать резерв финала: сколько бы их ни было,
+      // на завершающий ответ должно остаться WRAP_RESERVE
+      const toolBudget = Math.max(1500, remain() - WRAP_RESERVE);
       const results = await Promise.all(toolUses.slice(0, 3).map(async (tu) => {
         let out;
         if (tu.name === 'fetch_url') {
           out = await toolFetchUrl(tu.input && tu.input.url);
           trace.push({ tool: 'fetch_url', url: String((tu.input && tu.input.url) || '').slice(0, 200) });
+          if (out) toolNotes.push({ who: '🌐 сеть', out: String(out).slice(0, 700) });
         } else if (tu.name === 'ask_planet') {
           const pid = String((tu.input && tu.input.id) || '');
-          out = await toolAskPlanet(apiKey, pid, (tu.input && tu.input.question) || '', addCost, remain() - 1000);
+          out = await toolAskPlanet(apiKey, pid, (tu.input && tu.input.question) || '', addCost, toolBudget);
           trace.push({ tool: 'ask_planet', id: pid, q: String((tu.input && tu.input.question) || '').slice(0, 120) });
+          // титул планеты — из первого слова её системного промпта («Ты — Стратегорум, …»)
+          const title = ((PLANET_SYS[pid] || '').match(/Ты — ([^,]+),/) || [])[1] || pid;
+          if (out) toolNotes.push({ who: '🪐 ' + title, out: String(out).slice(0, 900) });
         } else {
           out = 'неизвестный инструмент';
         }
@@ -547,8 +564,11 @@ exports.handler = async (event) => {
       .map((b) => b.text)
       .join('\n')
       .trim();
-    // никогда не отдаём пустоту (напр. оборвались на tool_use по времени)
-    const safeText = text || 'Задумался слишком глубоко — задай короче или по частям.';
+    // никогда не отдаём пустоту (напр. оборвались на tool_use по времени):
+    // если руки что-то собрали — отдаём их доклады, заглушка — самый крайний случай
+    const safeText = text ||
+      (toolNotes.length ? 'Совет собрал, своими словами свести не успел — вот доклады напрямую:\n\n' + notesText()
+        : 'Задумался слишком глубоко — задай короче или по частям.');
     return json(200, { text: safeText, usage, model: data.model || model, budget, trace });
   } catch (e) {
     console.error('proxy failure', e && e.message);
